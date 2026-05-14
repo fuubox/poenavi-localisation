@@ -170,7 +170,7 @@ class Styles:
                 background: transparent;
             }}
             QCheckBox::indicator:checked {{
-                image: url({check_path.replace(os.sep, '/')});
+                image: url("{check_path.replace(os.sep, '/')}");
                 border: 2px solid #4488ff;
             }}
             QCheckBox::indicator:unchecked:hover {{

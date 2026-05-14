@@ -54,7 +54,13 @@ def disconnect_poe() -> tuple:
     kernel32.CloseHandle.argtypes = [wt.HANDLE]
 
     # --- PoEプロセスのPIDを取得 ---
-    target_names = {"pathofexile.exe", "pathofexilesteam.exe", "pathofexile_x64_egs.exe"}
+    target_names = {
+        "pathofexile.exe",
+        "pathofexilesteam.exe",
+        "pathofexile_x64steam.exe",
+        "pathofexile_x64_egs.exe",
+        "pathofexileegs.exe",
+    }
     poe_pids = set()
 
     snap = kernel32.CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0)

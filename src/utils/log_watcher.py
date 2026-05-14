@@ -1,11 +1,14 @@
 """
 PoE Client.txt ログ監視モジュール
 エリア入場とレベルアップを検知してシグナルを発行する。
+PoE1/PoE2で最終クリアイベントの文言が異なる可能性を考慮する。
 """
 
 import os
 import re
 from PySide6.QtCore import QObject, QTimer, Signal
+
+from src.utils.poe_version_data import POE1
 
 
 class LogWatcher(QObject):
@@ -16,6 +19,8 @@ class LogWatcher(QObject):
     level_up = Signal(str, int)     # キャラ名, レベル
     kitava_defeated = Signal()      # Act5キタヴァ討伐検知
     act10_cleared = Signal()        # Act10キタヴァ討伐検知
+    act4_cleared = Signal()         # PoE2 Act4クリア検知
+    progress_flag_detected = Signal(str)  # PoE2進行フラグ (例: act1_rustking_dead)
     
     # ログ行のパターン（日本語クライアント）
     # "あなたは地下墓地に入場しました。"
@@ -35,6 +40,7 @@ class LogWatcher(QObject):
         super().__init__(parent)
         self.log_path = log_path
         self.poll_interval_ms = poll_interval_ms
+        self.poe_version = POE1
         self._file_pos = 0
         self._timer = QTimer(self)
         self._timer.timeout.connect(self._poll)
@@ -49,6 +55,9 @@ class LogWatcher(QObject):
         self._file_pos = 0
         if was_active:
             self.start()
+
+    def set_poe_version(self, poe_version: str):
+        self.poe_version = poe_version
     
     def start(self):
         """監視開始"""
@@ -179,19 +188,54 @@ class LogWatcher(QObject):
             zone_name = m.group(1).strip()
             if zone_name in ("(null)", "(unknown)"):
                 return  # 遷移時に出る無効なエントリを無視
+            if (
+                re.fullmatch(r"アクト\d+", zone_name)
+                or re.fullmatch(r"Act\s*\d+", zone_name, re.IGNORECASE)
+                or zone_name in ("幕間", "Interlude")
+            ):
+                return  # ウェイポイント帰還などで一瞬出る章名はガイド更新対象にしない
             print(f"[LogWatcher] Zone detected (Set Source): {zone_name} (pos={self._file_pos}, line={line.strip()[:80]})")
             self.zone_entered.emit(zone_name)
             return
         
-        # Act10キタヴァ討伐チェック（無慈悲 = Act10）
-        if "プレイヤーはキタヴァの無慈悲な苦悩により永続的に弱体化した" in line or \
-           "Kitava's merciless affliction" in line:
+        if self.poe_version != POE1:
+            if "錆の王:" in line or "The Rust King:" in line:
+                self.progress_flag_detected.emit("act1_rustking_dead")
+                return
+            if "永遠なる法務官、" in line or "Draven, the Eternal Praetor:" in line:
+                self.progress_flag_detected.emit("act1_draven_dead")
+                return
+            if "法務官の妻、" in line or "Asinia, the Praetor's Consort:" in line:
+                self.progress_flag_detected.emit("act1_asinia_dead")
+                return
+            if "汚物の女王:" in line or "Queen of Filth:" in line:
+                self.progress_flag_detected.emit("act3_queenfilth_dead")
+                return
+            if "ハートリン船長:" in line or "Captain Hartlin:" in line:
+                self.progress_flag_detected.emit("act4_hartlin_dead")
+                return
+            if "フードをかぶった者: 終わりだ、タヴァカイ。" in line or "The Hooded One: It is over, Tavakai." in line:
+                self.progress_flag_detected.emit("act4_tavakai_dead")
+                self.act4_cleared.emit()
+                return
+            if "ウーナ: 自然の精たちが！何を" in line or "Una: The fey spirits!" in line:
+                self.progress_flag_detected.emit("interlude1_siora_dead")
+                return
+            if "恐怖の看守、オスウィン:" in line or "Oswin, The Dread Warden:" in line:
+                self.progress_flag_detected.emit("interlude1_veynar_dead")
+                return
+
+        # PoE1固有: Act10キタヴァ討伐チェック（無慈悲 = Act10）
+        if self.poe_version == POE1 and (
+           "プレイヤーはキタヴァの無慈悲な苦悩により永続的に弱体化した" in line or \
+           "Kitava's merciless affliction" in line):
             self.act10_cleared.emit()
             return
         
-        # Act5キタヴァ討伐チェック（残酷 = Act5）
-        if "プレイヤーはキタヴァの残酷な苦悩により永続的に弱体化した" in line or \
-           "Kitava's cruel affliction" in line:
+        # PoE1固有: Act5キタヴァ討伐チェック（残酷 = Act5）
+        if self.poe_version == POE1 and (
+           "プレイヤーはキタヴァの残酷な苦悩により永続的に弱体化した" in line or \
+           "Kitava's cruel affliction" in line):
             self.kitava_defeated.emit()
             return
         

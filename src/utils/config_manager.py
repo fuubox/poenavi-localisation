@@ -2,6 +2,8 @@ import json
 import os
 import sys
 
+from src.utils.poe_version_data import POE1
+
 class ConfigManager:
     CONFIG_FILE = "config.json"
 
@@ -14,8 +16,17 @@ class ConfigManager:
     DEFAULT_CONFIG = {
         "hotkeys": {
             "start_stop": "F1",
-            "reset": "F2"
+            "reset": "F2",
+            "lap": "F3",
+            "undo_lap": "F4",
+            "logout": "F5",
+            "click_through": "F6",
+            "hideout": "F11",
+            "monastery": "F12",
+            "search_string_test": "none"
         },
+        "poe_version": POE1,
+        "poe_version_mode": "ask",
         # 今後色設定などもここから読み込むように拡張可能
         "text_color": "#e9ffbd"
     }

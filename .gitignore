@@ -9,6 +9,10 @@ build/
 
 # User data (generated at runtime)
 runs/
+notes_poe1.json
+notes_poe2.json
+progress_flags_poe2.json
+vendor_search_presets.json
 
 # IDE
 .vscode/
@@ -18,6 +22,9 @@ runs/
 
 # Work files
 area_level_mapping.txt
+tasks/
+timer_poe1.json
+timer_poe2.json
 
 # OS
 .DS_Store

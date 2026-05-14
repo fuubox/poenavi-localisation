@@ -15,7 +15,12 @@ pyinstaller --noconfirm --onedir --windowed ^
     --add-data "icon.ico;." ^
     --add-data "config.json;." ^
     --add-data "guide_data.json;." ^
+    --add-data "guide_data_poe2.json;." ^
     --add-data "monster_levels.json;." ^
+    --add-data "notes_poe1.json;." ^
+    --add-data "notes_poe2.json;." ^
+    --add-data "progress_flags_poe2.json;." ^
+    --add-data "data;data" ^
     --add-data "assets;assets" ^
     --add-data "maps;maps" ^
     --hidden-import "PySide6.QtWidgets" ^
@@ -30,7 +35,8 @@ pyinstaller --noconfirm --onedir --windowed ^
 echo.
 if exist dist\PoENavi\PoENavi.exe (
     echo BUILD SUCCESS!
-    echo    exe is in: dist\PoENavi    echo    Zip the dist\PoENavi\ folder to distribute
+    echo    exe is in: dist\PoENavi
+    echo    Zip the dist\PoENavi\ folder to distribute
 ) else (
     echo BUILD FAILED. Check errors above.
 )

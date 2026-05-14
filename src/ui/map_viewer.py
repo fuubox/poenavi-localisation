@@ -1,6 +1,6 @@
 """
 マップ画像サムネイル一覧 + クリック拡大表示
-maps/<ゾーン名>/ フォルダ内の画像を自動読み込み
+maps/PoE1/<ゾーン名>/ または maps/PoE2/<ゾーン名>/ フォルダ内の画像を自動読み込み
 """
 
 import os
@@ -33,7 +33,7 @@ def get_maps_dir():
     )
 
 
-def load_zone_maps(zone_name: str, part2: bool = False, route: str = "") -> list[str]:
+def load_zone_maps(zone_name: str, part2: bool = False, route: str = "", poe_version: str = "PoE1") -> list[str]:
     """
     ゾーン名に対応するマップ画像パスのリストを返す
     検索優先順位:
@@ -42,7 +42,7 @@ def load_zone_maps(zone_name: str, part2: bool = False, route: str = "") -> list
       3. ゾーン名#2         (Part2)
       4. ゾーン名            (デフォルト)
     """
-    maps_dir = get_maps_dir()
+    maps_dir = os.path.join(get_maps_dir(), poe_version)
     
     if route and part2:
         rd = os.path.join(maps_dir, f"{zone_name}~{route}#2")
@@ -113,9 +113,10 @@ class ClickableThumb(QLabel):
 class MapImageDialog(QDialog):
     """拡大画像表示ダイアログ（リサイズ可能、サイズ保持）"""
     
-    def __init__(self, image_path: str, all_paths: list[str] = None, parent=None):
+    def __init__(self, image_path: str, all_paths: list[str] = None, poe_version: str = "PoE1", parent=None):
         super().__init__(parent)
         self.image_path = image_path
+        self.poe_version = poe_version
         self.all_paths = all_paths or [image_path]
         self.current_index = self.all_paths.index(image_path) if image_path in self.all_paths else 0
         self._pixmaps = {}  # キャッシュ
@@ -130,6 +131,16 @@ class MapImageDialog(QDialog):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(10, 10, 10, 10)
         
+        self.notice_label = QLabel(
+            "実際のレイアウトは、ワールドマップ上の隣接エリアとの位置関係に依存してランダムに変動します。\n"
+            "そのため、上下または左右に反転したレイアウトや、90度回転したようなレイアウトになることがあります。"
+        )
+        self.notice_label.setWordWrap(True)
+        self.notice_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        self.notice_label.setStyleSheet("color: #ffc832; font-size: 13px; padding: 4px 6px;")
+        self.notice_label.setVisible(self.poe_version == "PoE2")
+        layout.addWidget(self.notice_label)
+
         # 画像ラベル
         self.image_label = QLabel()
         self.image_label.setAlignment(Qt.AlignCenter)
@@ -258,6 +269,7 @@ class MapThumbnailWidget(QWidget):
         self._open_dialog = None
         self.auto_open = False
         self.auto_position = True
+        self._poe_version = "PoE1"
         
         self.setStyleSheet("background: transparent;")
         
@@ -281,15 +293,19 @@ class MapThumbnailWidget(QWidget):
         
         main_layout.addWidget(self.thumb_container)
     
-    def load_maps(self, zone_name: str, part2: bool = False, zone_changed: bool = False, route: str = ""):
+    def load_maps(self, zone_name: str, part2: bool = False, zone_changed: bool = False, route: str = "", poe_version: str = "PoE1"):
         """ゾーンのマップ画像を読み込んで表示"""
-        # 開いているマップダイアログを閉じる
-        if self._open_dialog is not None:
+        paths = load_zone_maps(zone_name, part2=part2, route=route, poe_version=poe_version)
+        paths_changed = paths != self.current_paths or poe_version != self._poe_version
+
+        # 開いているマップダイアログは、実際に別マップへ切り替わる時だけ閉じる。
+        # レベルアップ等の同一エリア再評価では、表示中の拡大画像を維持する。
+        if self._open_dialog is not None and paths_changed:
             self._open_dialog.close()
             self._open_dialog = None
+
         self._clear_thumbs()
-        
-        paths = load_zone_maps(zone_name, part2=part2, route=route)
+        self._poe_version = poe_version
         self.current_paths = paths
         
         if not paths:
@@ -319,12 +335,17 @@ class MapThumbnailWidget(QWidget):
 
         # auto_open が有効 かつ エリア移動時のみ自動的にダイアログを開く
         if self.auto_open and zone_changed and paths:
-            self._on_thumb_clicked(paths[0])
+            self.open_first_map()
+
+    def open_first_map(self):
+        """現在読み込んでいるマップの先頭画像を開く"""
+        if self.current_paths and self._open_dialog is None:
+            self._on_thumb_clicked(self.current_paths[0])
 
     def _on_thumb_clicked(self, image_path: str):
         """サムネイルクリック → 拡大表示（メインウィンドウと同じモニターの左隣に配置）"""
         # 親なしで作成（exec()による親基準の中央配置を防ぐ）
-        dialog = MapImageDialog(image_path, all_paths=self.current_paths, parent=None)
+        dialog = MapImageDialog(image_path, all_paths=self.current_paths, poe_version=getattr(self, '_poe_version', 'PoE1'), parent=None)
 
         # メインウィンドウがいるモニター基準で隣に配置
         if self.auto_position:
