@@ -1386,6 +1386,12 @@ class SettingsDialog(QDialog):
         Styles.apply_checkbox_style(self.window_lock_check)
         self.window_lock_check.setChecked(self.current_config.get("window_locked", False))
         window_layout.addWidget(self.window_lock_check)
+
+        # 常に最前面表示
+        self.always_on_top_check = QCheckBox("常に最前面に表示する")
+        Styles.apply_checkbox_style(self.always_on_top_check)
+        self.always_on_top_check.setChecked(self.current_config.get("always_on_top", True))
+        window_layout.addWidget(self.always_on_top_check)
         
         # 右端配置チェックボックス
         self.snap_right_edge_cb = QCheckBox("起動時にモニター右端に配置")
@@ -1951,6 +1957,7 @@ class SettingsDialog(QDialog):
             "window_opacity": self.opacity_slider.value(),
             "text_opacity": self.text_opacity_slider.value(),
             "window_locked": self.window_lock_check.isChecked(),
+            "always_on_top": self.always_on_top_check.isChecked(),
             "display_monitor": self.monitor_combo.currentData(),
             "snap_to_right_edge": self.snap_right_edge_cb.isChecked(),
             "auto_open_map": self.auto_open_map_check.isChecked(),

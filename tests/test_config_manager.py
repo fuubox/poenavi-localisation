@@ -27,6 +27,8 @@ def write_default_config(app_dir: Path, overrides=None):
         "text_color": "#e9ffbd",
         "guide_detail_level": "beginner",
         "guide_detail_level_selected": False,
+        "always_on_top": True,
+        "notified_update_version": "",
     }
     if overrides:
         for key, value in overrides.items():
@@ -81,6 +83,8 @@ class ConfigManagerTest(unittest.TestCase):
                 self.assertEqual(loaded["text_color"], "#abcdef")
                 self.assertEqual(loaded["guide_detail_level"], "beginner")
                 self.assertFalse(loaded["guide_detail_level_selected"])
+                self.assertTrue(loaded["always_on_top"])
+                self.assertEqual(loaded["notified_update_version"], "")
                 self.assertEqual(loaded["schemaVersion"], ConfigManager.CURRENT_SCHEMA_VERSION)
                 self.assertTrue((user_dir / ConfigManager.CONFIG_FILE).exists())
                 self.assertFalse((app_dir / ConfigManager.CONFIG_FILE).exists())

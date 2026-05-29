@@ -24,6 +24,8 @@
     "lap_expanded": false,
     "timer_size": "medium",
     "setup_completed": false,
+    "always_on_top": true,
+    "notified_update_version": "",
     "window_locked": false,
     "window_opacity": 80,
     "auto_lap": true,

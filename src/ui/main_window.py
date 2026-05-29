@@ -29,6 +29,22 @@ from src.ui.gem_tracker_widget import GemTrackerWidget, PoBImportDialog
 from PySide6.QtWidgets import QComboBox, QDialog, QFormLayout
 
 
+DEFAULT_CLICK_THROUGH_HOTKEY = "F6"
+
+
+def _is_always_on_top_enabled(parent=None):
+    """設定に応じて最前面表示を有効にするか返す。"""
+    if parent is not None and hasattr(parent, "config"):
+        return parent.config.get("always_on_top", True)
+    return ConfigManager.load_config().get("always_on_top", True)
+
+
+def _with_optional_always_on_top(flags, parent=None):
+    if _is_always_on_top_enabled(parent):
+        return flags | Qt.WindowStaysOnTopHint
+    return flags & ~Qt.WindowStaysOnTopHint
+
+
 class SearchStringPasteTestDialog(QDialog):
     """検索文字列メニュー → PoE復帰 → 検索欄貼り付けの技術検証用ダイアログ"""
 
@@ -37,7 +53,7 @@ class SearchStringPasteTestDialog(QDialog):
         self.target_hwnd = target_hwnd
         self.choices = choices or []
         self.setWindowTitle("店売り・スタッシュ検索")
-        self.setWindowFlags(Qt.Tool | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
+        self.setWindowFlags(_with_optional_always_on_top(Qt.Tool | Qt.FramelessWindowHint, parent))
         self.setAttribute(Qt.WA_DeleteOnClose, True)
         self.setStyleSheet(Styles.MAIN_WINDOW)
 
@@ -445,7 +461,7 @@ class MemoDialog(QDialog):
     
     def __init__(self, parent=None, notes_path: str = ""):
         super().__init__(parent)
-        self.setWindowFlags(Qt.Window | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
+        self.setWindowFlags(_with_optional_always_on_top(Qt.Window | Qt.FramelessWindowHint, parent))
         self.setAttribute(Qt.WA_TranslucentBackground)
         self.resize(350, 300)
         self.notes_path = notes_path
@@ -698,7 +714,7 @@ class VendorSearchPresetDialog(QDialog):
         self.option_checkboxes = []
         self.helper_categories = {}
         self._saved_snapshot = []
-        self.setWindowFlags(Qt.Window | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
+        self.setWindowFlags(_with_optional_always_on_top(Qt.Window | Qt.FramelessWindowHint, parent))
         self.setAttribute(Qt.WA_TranslucentBackground)
         # 初期表示は従来どおり広めに開く。小さいモニターでは手動リサイズ + REGEX欄スクロールで対応。
         self.resize(1450, 850)
@@ -1769,7 +1785,7 @@ class MainWindow(QMainWindow):
         if os.path.exists(icon_path):
             self.setWindowIcon(QIcon(icon_path))
         
-        self.setWindowFlags(Qt.WindowStaysOnTopHint | Qt.FramelessWindowHint)
+        self._apply_window_flags()
         self.setAttribute(Qt.WA_TranslucentBackground)
         
         self.setStyleSheet(Styles.MAIN_WINDOW)
@@ -1997,6 +2013,9 @@ class MainWindow(QMainWindow):
                 def ver_tuple(v):
                     return tuple(int(x) for x in v.split(".") if x.isdigit())
                 if ver_tuple(tag) > ver_tuple(__version__):
+                    notified_version = ConfigManager.load_config().get("notified_update_version", "")
+                    if notified_version == tag:
+                        return
                     release_url = data.get("html_url", "https://github.com/buri34/poenavi/releases/latest")
                     self._update_signal.emit(tag, release_url)
             except Exception:
@@ -2010,6 +2029,10 @@ class MainWindow(QMainWindow):
         from PySide6.QtGui import QDesktopServices
         from PySide6.QtCore import QUrl
         
+        if self.config.get("notified_update_version") != version:
+            self.config["notified_update_version"] = version
+            ConfigManager.save_config(self.config)
+
         dialog = QDialog(self)
         dialog.setWindowTitle("🔔 アップデートのお知らせ")
         dialog.setFixedSize(360, 150)
@@ -2274,9 +2297,9 @@ class MainWindow(QMainWindow):
         title_bar.setContentsMargins(5, 16, 16, 0)
         
         # クリックスルー状態表示
+        self.click_through = False
         self.click_through_label = QLabel("")
-        self.click_through_label.setStyleSheet("color: #ff9944; font-size: 14px; font-weight: bold;")
-        self.click_through_label.setVisible(False)
+        self._update_click_through_label()
         title_bar.addWidget(self.click_through_label)
         title_bar.addStretch()
         
@@ -3519,7 +3542,7 @@ class MainWindow(QMainWindow):
             
             self.hotkey_map = {}
             for action, default in [("start_stop", "F1"), ("reset", "F2"), ("lap", "F3"),
-                                     ("undo_lap", "F4"), ("click_through", "F6"), ("logout", "F5"),
+                                     ("undo_lap", "F4"), ("click_through", DEFAULT_CLICK_THROUGH_HOTKEY), ("logout", "F5"),
                                      ("hideout", "F11"), ("monastery", "F12"),
                                      ("search_string_test", "none")]:
                 key = hotkeys.get(action, default)
@@ -3752,14 +3775,25 @@ class MainWindow(QMainWindow):
                 SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED)
         
         # 視覚的フィードバック
-        hotkey = self.config.get('hotkeys', {}).get('click_through', 'F6')
+        self._update_click_through_label()
+        hotkey = self.config.get('hotkeys', {}).get('click_through', DEFAULT_CLICK_THROUGH_HOTKEY)
         if self.click_through:
-            self.click_through_label.setText(f"🔓 クリックスルーON（{hotkey}で解除）")
-            self.click_through_label.setVisible(True)
             print(f"[INFO] クリックスルー ON（{hotkey}で解除）")
         else:
-            self.click_through_label.setVisible(False)
-            print("[INFO] クリックスルー OFF")
+            print(f"[INFO] クリックスルー OFF（{hotkey}でON）")
+
+    def _update_click_through_label(self):
+        """クリックスルー状態の案内表示を更新する。"""
+        if not hasattr(self, "click_through_label"):
+            return
+        hotkey = self.config.get('hotkeys', {}).get('click_through', DEFAULT_CLICK_THROUGH_HOTKEY)
+        if getattr(self, 'click_through', False):
+            self.click_through_label.setText(f"🔓 クリックスルーON（{hotkey}で解除）")
+            self.click_through_label.setStyleSheet("color: #ff9944; font-size: 14px; font-weight: bold;")
+        else:
+            self.click_through_label.setText(f"クリックスルーOFF（{hotkey}でON）")
+            self.click_through_label.setStyleSheet("color: rgba(176, 255, 123, 0.45); font-size: 12px; font-weight: normal;")
+        self.click_through_label.setVisible(True)
 
     # --- レベルガイド ---
     def _is_town_zone(self, zone_name: str) -> bool:
@@ -4280,12 +4314,16 @@ class MainWindow(QMainWindow):
         if dialog.exec():
             # 設定保存
             previous_timer_size_setting = self.config.get("timer_size", "large")
+            previous_always_on_top = self.config.get("always_on_top", True)
             new_settings = dialog.get_settings()
             self.config.update(new_settings)
             ConfigManager.save_config(self.config)
+            if self.config.get("always_on_top", True) != previous_always_on_top:
+                self._apply_window_flags()
             
             # ホットキー再登録
             self.register_hotkeys()
+            self._update_click_through_label()
             
             # ログ監視の再設定
             client_log_paths = self.config.get("client_log_paths", {})
@@ -4383,6 +4421,15 @@ class MainWindow(QMainWindow):
             zone_id = self._get_zone_id(self.current_zone)
             visit_num = self.zone_visit_counts.get(self.current_zone, 1)
             self._update_guide_and_map(self.current_zone, zone_id, visit_num)
+
+    def _main_window_flags(self):
+        return _with_optional_always_on_top(Qt.FramelessWindowHint, self)
+
+    def _apply_window_flags(self):
+        was_visible = self.isVisible()
+        self.setWindowFlags(self._main_window_flags())
+        if was_visible:
+            self.show()
             
     def showEvent(self, event):
         super().showEvent(event)

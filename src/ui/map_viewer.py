@@ -124,7 +124,11 @@ class MapImageDialog(QDialog):
         self._positioned = False
 
         self.setWindowTitle(os.path.basename(image_path))
-        self.setWindowFlags(Qt.Dialog | Qt.WindowStaysOnTopHint)
+        from src.utils.config_manager import ConfigManager
+        flags = Qt.Dialog
+        if ConfigManager.load_config().get("always_on_top", True):
+            flags |= Qt.WindowStaysOnTopHint
+        self.setWindowFlags(flags)
         self.setStyleSheet("background: #111122;")
         self.setMinimumSize(200, 150)
         
