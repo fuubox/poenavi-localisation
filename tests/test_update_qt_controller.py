@@ -84,3 +84,20 @@ def test_launch_updater_copies_executable_archive_and_uses_argument_list(
     assert staged_archive.read_bytes() == b"zip"
     assert cwd == str(updater_work)
     assert not download_dir.exists()
+
+
+def test_cleanup_stale_update_directories(tmp_path, monkeypatch):
+    stale = tmp_path / "PoENavi-Updater-old"
+    stale.mkdir()
+    (stale / "PoENaviUpdater.exe").write_text("old", encoding="utf-8")
+    unrelated = tmp_path / "other-app"
+    unrelated.mkdir()
+    monkeypatch.setattr(
+        "src.update.qt_controller.tempfile.gettempdir",
+        lambda: str(tmp_path),
+    )
+
+    UpdateController._cleanup_stale_update_dirs()
+
+    assert not stale.exists()
+    assert unrelated.exists()

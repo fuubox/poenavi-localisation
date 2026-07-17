@@ -36,6 +36,17 @@ class UpdateController(QObject):
         self._downloading = False
         self._cancel = threading.Event()
         self._work_dir: Path | None = None
+        if getattr(sys, "frozen", False) and sys.platform == "win32":
+            cleanup_timer = threading.Timer(10, self._cleanup_stale_update_dirs)
+            cleanup_timer.daemon = True
+            cleanup_timer.start()
+
+    @staticmethod
+    def _cleanup_stale_update_dirs() -> None:
+        temp_dir = Path(tempfile.gettempdir())
+        for path in temp_dir.glob("PoENavi-Updater-*"):
+            if path.is_dir():
+                shutil.rmtree(path, ignore_errors=True)
 
     def check(self, manual: bool) -> None:
         if self._checking:
