@@ -2014,13 +2014,6 @@ class SettingsDialog(QDialog):
         self.zone_scroll.setWidget(self.zone_scroll_widget)
         zone_layout.addWidget(self.zone_scroll)
         
-        # Reset to defaults button
-        reset_zones_btn = QPushButton("デフォルトに戻す")
-        reset_zones_btn.setStyleSheet(Styles.BUTTON)
-        reset_zones_btn.clicked.connect(self._reset_zone_defaults)
-        reset_zones_btn.setEnabled(False)  # 一般ユーザーには無効（機能は残す）
-        zone_layout.addWidget(reset_zones_btn)
-        
         tabs.addTab(zone_tab, "エリア情報")
 
         # === アプリ情報タブ ===
@@ -2636,17 +2629,6 @@ class SettingsDialog(QDialog):
         self.town_zones_edit.setPlainText("\n".join(self.town_zones_by_version.get(self.poe_version, get_town_zones(self.poe_version))))
         self._rebuild_zone_tab()
 
-    def _reset_zone_defaults(self):
-        """ゾーンデータをデフォルトにリセット（現在バージョンのみ）"""
-        defaults_by_version = self._default_zone_data_for_version(self.poe_version)
-        self.zone_data = defaults_by_version
-        self.zone_data_by_version[self.poe_version] = defaults_by_version
-        for act_name, widgets in self.zone_spinboxes.items():
-            defaults = defaults_by_version.get(act_name, [])
-            for i, (name_edit, _zid) in enumerate(widgets):
-                if i < len(defaults):
-                    name_edit.setText(defaults[i]["zone"])
-    
     def get_settings(self):
         self._save_current_zone_ui_to_memory()
         self.town_zones_by_version[self.poe_version] = [z.strip() for z in self.town_zones_edit.toPlainText().split("\n") if z.strip()]
