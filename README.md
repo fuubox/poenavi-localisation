@@ -439,6 +439,11 @@ PoE1ではAct 6-10の一部エリアがAct 1-5と同名で登場します。
 
 タグと `APP_VERSION` が一致しない場合、workflowはReleaseを作成せず失敗します。
 
+ビルド時にはアップデート元リポジトリも成果物へ固定されます。判定順は
+`-ReleaseRepository owner/repo`、GitHub Actions の `GITHUB_REPOSITORY`、
+ローカルの `origin` URL です。有効なリポジトリを判定できない場合はビルドを
+失敗させるため、fork版が誤って別リポジトリのReleaseへ更新されることはありません。
+
 ---
 
 ## 🛠️ Tech Stack

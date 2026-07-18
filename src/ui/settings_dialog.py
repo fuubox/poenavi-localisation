@@ -15,6 +15,7 @@ from src.utils.config_manager import ConfigManager
 from src.utils.area_notes import get_area_note, set_area_note
 from src.utils.zone_lookup import get_zone_display_name
 from src.utils.i18n import EN, JA, get_locale, tr, tr_ui
+from src.update.release_channel import releases_page_url
 import webbrowser
 
 
@@ -2114,7 +2115,7 @@ class SettingsDialog(QDialog):
             QPushButton:hover {{ background: rgba(65, 65, 65, 220); }}
         """)
         github_btn.setCursor(Qt.PointingHandCursor)
-        github_btn.clicked.connect(lambda: webbrowser.open("https://github.com/buri34/poenavi/releases"))
+        github_btn.clicked.connect(lambda: webbrowser.open(releases_page_url()))
         about_layout.addWidget(github_btn)
 
         # 区切り線

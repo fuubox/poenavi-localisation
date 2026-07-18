@@ -392,6 +392,7 @@ def validate_resources(root: Path = ROOT) -> list[str]:
     build_script = (root / "scripts" / "build_release.ps1").read_text(encoding="utf-8")
     required = (
         "data\\i18n",
+        "build\\generated\\update_channel.json;data",
         "guide_data.json",
         "guide_data_poe2.json",
         "guide_data_en.json",

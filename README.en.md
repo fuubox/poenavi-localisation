@@ -236,3 +236,8 @@ python -m zipfile -l PoENavi.zip
 The resulting `PoENavi.zip.sha256` must be distributed with the archive. The
 release contains both locale catalogs and all four guide datasets under the
 packaged application's `_internal` directory.
+
+The build also pins the packaged updater to a GitHub repository. It uses an
+explicit `-ReleaseRepository owner/repo`, then `GITHUB_REPOSITORY` in Actions,
+then the local `origin` URL. The release build fails if none is valid, so fork
+artifacts cannot silently update from a different repository.
