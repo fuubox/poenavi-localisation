@@ -3,6 +3,8 @@
 maps/PoE1/<ゾーン名>/ または maps/PoE2/<ゾーン名>/ フォルダ内の画像を自動読み込み
 """
 
+from src.utils.i18n import ui_text
+
 import os
 import sys
 from PySide6.QtWidgets import (
@@ -136,8 +138,8 @@ class MapImageDialog(QDialog):
         layout.setContentsMargins(10, 10, 10, 10)
         
         self.notice_label = QLabel(
-            "実際のレイアウトは、ワールドマップ上の隣接エリアとの位置関係に依存してランダムに変動します。\n"
-            "そのため、上下または左右に反転したレイアウトや、90度回転したようなレイアウトになることがあります。"
+            ui_text("実際のレイアウトは、ワールドマップ上の隣接エリアとの位置関係に依存してランダムに変動します。\n"
+            "そのため、上下または左右に反転したレイアウトや、90度回転したようなレイアウトになることがあります。")
         )
         self.notice_label.setWordWrap(True)
         self.notice_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
@@ -282,7 +284,7 @@ class MapThumbnailWidget(QWidget):
         main_layout.setSpacing(2)
         
         # ヘッダ
-        self.header_label = QLabel("🗺 マップレイアウト")
+        self.header_label = QLabel(ui_text("🗺 マップレイアウト"))
         self.header_label.setStyleSheet(
             "color: rgba(176, 255, 123, 0.7); font-size: 11px; font-weight: bold;"
         )
@@ -344,7 +346,7 @@ class MapThumbnailWidget(QWidget):
             return
         
         self.setVisible(True)
-        self.header_label.setText(f"🗺 マップレイアウト ({len(paths)}パターン)")
+        self.header_label.setText(ui_text(f"🗺 マップレイアウト ({len(paths)}パターン)"))
         
         row_layout = QHBoxLayout()
         row_layout.setContentsMargins(0, 0, 0, 0)
