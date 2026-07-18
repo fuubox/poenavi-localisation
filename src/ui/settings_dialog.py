@@ -2289,39 +2289,6 @@ class SettingsDialog(QDialog):
         """)
         row.addWidget(name_edit)
         
-        guide_btn = QPushButton("📝")
-        guide_btn.setFixedSize(30, 26)
-        guide_btn.setToolTip("ガイドデータを編集")
-        guide_btn.setStyleSheet(f"""
-            QPushButton {{ 
-                background: rgba(40,40,40,200); color: {Styles.TEXT_COLOR}; 
-                border: 1px solid rgba(176,255,123,0.3); border-radius: 3px; font-size: 12px;
-            }}
-            QPushButton:hover {{ background: rgba(80,80,80,200); }}
-        """)
-        guide_btn.clicked.connect(lambda checked, ne=name_edit, zid=zone_id: self._open_guide_editor(ne, zid))
-        row.addWidget(guide_btn)
-
-        if self.poe_version == POE1:
-            mini_btn = self._create_small_action_button("み", "みになびを編集")
-            mini_btn.clicked.connect(lambda checked, ne=name_edit, zid=zone_id: self._open_mini_navi_editor(ne, zid))
-            row.addWidget(mini_btn)
-        
-        if self.poe_version == POE2:
-            summary_btn = QPushButton("要")
-            summary_btn.setFixedSize(30, 26)
-            summary_btn.setToolTip("中級者向けサマリーを編集")
-            summary_btn.setStyleSheet(f"""
-                QPushButton {{
-                    background: rgba(40,40,40,200); color: {Styles.TEXT_COLOR};
-                    border: 1px solid rgba(176,255,123,0.3); border-radius: 3px;
-                    font-size: 11px; font-weight: bold;
-                }}
-                QPushButton:hover {{ background: rgba(80,80,80,200); }}
-            """)
-            summary_btn.clicked.connect(lambda checked, ne=name_edit, zid=zone_id: self._open_summary_editor(ne, zid))
-            row.addWidget(summary_btn)
-        
         row.addStretch()
         
         # Insert before the "+" button (last widget)
@@ -2561,40 +2528,6 @@ class SettingsDialog(QDialog):
                 """)
                 row.addWidget(name_edit)
 
-                guide_btn = QPushButton("📝")
-                guide_btn.setFixedSize(30, 26)
-                guide_btn.setToolTip("ガイドデータを編集")
-                guide_btn.setStyleSheet(f"""
-                    QPushButton {{ 
-                        background: rgba(40,40,40,200); color: {Styles.TEXT_COLOR}; 
-                        border: 1px solid rgba(176,255,123,0.3); border-radius: 3px;
-                        font-size: 12px;
-                    }}
-                    QPushButton:hover {{ background: rgba(80,80,80,200); }}
-                """)
-                guide_btn.clicked.connect(lambda checked, ne=name_edit, zid=zone_id: self._open_guide_editor(ne, zid))
-                row.addWidget(guide_btn)
-
-                if self.poe_version == POE1:
-                    mini_btn = self._create_small_action_button("み", "みになびを編集")
-                    mini_btn.clicked.connect(lambda checked, ne=name_edit, zid=zone_id: self._open_mini_navi_editor(ne, zid))
-                    row.addWidget(mini_btn)
-
-                if self.poe_version == POE2:
-                    summary_btn = QPushButton("要")
-                    summary_btn.setFixedSize(30, 26)
-                    summary_btn.setToolTip("中級者向けサマリーを編集")
-                    summary_btn.setStyleSheet(f"""
-                        QPushButton {{
-                            background: rgba(40,40,40,200); color: {Styles.TEXT_COLOR};
-                            border: 1px solid rgba(176,255,123,0.3); border-radius: 3px;
-                            font-size: 11px; font-weight: bold;
-                        }}
-                        QPushButton:hover {{ background: rgba(80,80,80,200); }}
-                    """)
-                    summary_btn.clicked.connect(lambda checked, ne=name_edit, zid=zone_id: self._open_summary_editor(ne, zid))
-                    row.addWidget(summary_btn)
-
                 row.addStretch()
                 act_layout.addLayout(row)
                 act_widgets.append((name_edit, zone_id))
@@ -2633,9 +2566,8 @@ class SettingsDialog(QDialog):
         self._save_current_zone_ui_to_memory()
         self.town_zones_by_version[self.poe_version] = [z.strip() for z in self.town_zones_edit.toPlainText().split("\n") if z.strip()]
 
-        # マスタデータ・ガイドデータを保存
+        # エリア一覧のみ保存する。公式ガイドはユーザー編集対象外。
         save_zone_master_data(self.zone_data_by_version, self.town_zones_by_version)
-        save_guide_data(self.guide_data, self.poe_version)
         
         def normalize_log_path(text: str) -> str:
             # Explorerの「パスのコピー」は前後に引用符を付けるため、保存時に外側だけ除去する

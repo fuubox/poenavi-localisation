@@ -25,6 +25,7 @@ from src.utils.poe_progress_data import get_auto_lap_triggers, get_clear_message
 from src.utils.pob_importer import import_pob, get_pob_skill_sets
 from src.utils.gem_resolver import resolve_gem_acquisition
 from src.utils.poelab_links import POELAB_HOME, find_daily_notes_url
+from src.utils.area_notes import get_area_note, set_area_note
 from src.ui.gem_tracker_widget import GemTrackerWidget, PoBImportDialog, PoBSkillSetSelectionDialog
 from src.ui.update_dialogs import UpdateAvailableDialog, UpdateProgressDialog
 from src.update.qt_controller import UpdateController
@@ -1418,6 +1419,76 @@ class MemoDialog(QDialog):
     def closeEvent(self, event):
         self._save_notes()
         event.accept()
+
+
+class AreaNoteDialog(QDialog):
+    """現在のエリアに紐づく色付きユーザーメモ編集画面。"""
+
+    COLORS = MemoDialog.COLORS
+
+    def __init__(self, parent, zone_name: str, content: str):
+        super().__init__(parent)
+        self.setWindowTitle(f"ユーザーメモ — {zone_name}")
+        self.resize(520, 360)
+        self.setStyleSheet(Styles.MAIN_WINDOW)
+
+        layout = QVBoxLayout(self)
+        description = QLabel(f"📝 {zone_name} のユーザーメモ")
+        description.setStyleSheet(
+            f"color: {Styles.TEXT_COLOR}; font-size: 14px; font-weight: bold;"
+        )
+        layout.addWidget(description)
+
+        toolbar = QHBoxLayout()
+        toolbar.setSpacing(5)
+        for color_code, color_name in self.COLORS:
+            button = QPushButton()
+            button.setFixedSize(22, 22)
+            button.setToolTip(color_name)
+            button.setStyleSheet(
+                f"QPushButton {{ background: {color_code}; border: 1px solid #777; "
+                "border-radius: 3px; }} QPushButton:hover { border: 2px solid white; }"
+            )
+            button.clicked.connect(lambda checked=False, color=color_code: self._set_color(color))
+            toolbar.addWidget(button)
+        reset_button = QPushButton("標準色")
+        reset_button.setToolTip("選択範囲の文字色を標準色へ戻します")
+        reset_button.clicked.connect(lambda: self._set_color(Styles.TEXT_COLOR))
+        toolbar.addWidget(reset_button)
+        toolbar.addStretch()
+        layout.addLayout(toolbar)
+
+        from src.ui.settings_dialog import RichTextEdit
+        self.text_edit = RichTextEdit()
+        self.text_edit.setStyleSheet(
+            f"QTextEdit {{ background: #1a1a1a; color: {Styles.TEXT_COLOR}; "
+            "border: 1px solid #4b6b3b; padding: 7px; font-size: 13px; }}"
+        )
+        self.text_edit.set_from_html(content)
+        layout.addWidget(self.text_edit)
+
+        buttons = QHBoxLayout()
+        buttons.addStretch()
+        cancel_button = QPushButton("キャンセル")
+        cancel_button.clicked.connect(self.reject)
+        save_button = QPushButton("保存")
+        save_button.setDefault(True)
+        save_button.clicked.connect(self.accept)
+        buttons.addWidget(cancel_button)
+        buttons.addWidget(save_button)
+        layout.addLayout(buttons)
+
+    def _set_color(self, color: str):
+        from PySide6.QtGui import QColor
+
+        cursor = self.text_edit.textCursor()
+        char_format = cursor.charFormat()
+        char_format.setForeground(QColor(color))
+        cursor.mergeCharFormat(char_format)
+        self.text_edit.mergeCurrentCharFormat(char_format)
+
+    def content(self) -> str:
+        return self.text_edit.to_storage_html()
 
 
 class VendorSearchPresetDialog(QDialog):
@@ -3299,6 +3370,9 @@ class MainWindow(QMainWindow):
         # レベルガイド状態
         self.player_level = 1
         self.current_zone = ""
+        self._current_zone_id = None
+        self._current_zone_name = ""
+        self._current_area_note = ""
         self._current_poelab_type = None
         zone_master_data = load_zone_master_data()
         self.zone_data_by_version = zone_master_data["zone_data_by_version"]
@@ -4046,6 +4120,27 @@ class MainWindow(QMainWindow):
         guide_text_header_layout.addWidget(self.guide_text_toggle_btn)
         guide_text_header_layout.addStretch()
 
+        self.area_note_edit_button = QPushButton("📝 エリアメモ")
+        self.area_note_edit_button.setCursor(QCursor(Qt.PointingHandCursor))
+        self.area_note_edit_button.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Fixed)
+        self.area_note_edit_button.setToolTip("現在のエリアのユーザーメモを編集します")
+        self.area_note_edit_button.setStyleSheet(f"""
+            QPushButton {{
+                background: rgba(20, 30, 20, 160);
+                color: {Styles.TEXT_COLOR};
+                border: 1px solid rgba(176, 255, 123, 0.75);
+                border-radius: 5px;
+                padding: 3px 9px;
+                font-size: 11px;
+                font-weight: bold;
+            }}
+            QPushButton:hover {{ background: rgba(73, 110, 50, 180); color: #ffffff; }}
+            QPushButton:disabled {{ color: #666666; border-color: #555555; }}
+        """)
+        self.area_note_edit_button.clicked.connect(self.open_area_note_editor)
+        self.area_note_edit_button.setEnabled(False)
+        guide_text_header_layout.addWidget(self.area_note_edit_button)
+
         self.guide_detail_level_toggle_btn = QPushButton()
         self.guide_detail_level_toggle_btn.setCursor(QCursor(Qt.PointingHandCursor))
         self.guide_detail_level_toggle_btn.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Fixed)
@@ -4104,6 +4199,33 @@ class MainWindow(QMainWindow):
         """)
         guide_text_layout = QVBoxLayout(guide_text_frame)
         guide_text_layout.setContentsMargins(10, 8, 10, 8)
+
+        self.area_note_frame = QFrame()
+        self.area_note_frame.setStyleSheet("""
+            QFrame {
+                background: rgba(55, 45, 15, 190);
+                border: 1px solid rgba(255, 210, 80, 150);
+                border-radius: 5px;
+            }
+        """)
+        area_note_layout = QVBoxLayout(self.area_note_frame)
+        area_note_layout.setContentsMargins(9, 6, 9, 6)
+        area_note_layout.setSpacing(3)
+        area_note_title = QLabel("📝 ユーザーメモ")
+        area_note_title.setStyleSheet(
+            "color: #ffd86b; font-size: 11px; font-weight: bold; border: none; background: transparent;"
+        )
+        area_note_layout.addWidget(area_note_title)
+        self.area_note_label = QLabel()
+        self.area_note_label.setTextFormat(Qt.RichText)
+        self.area_note_label.setWordWrap(True)
+        self.area_note_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        self.area_note_label.setStyleSheet(
+            f"color: {Styles.TEXT_COLOR}; font-size: {self.guide_font_size}px; border: none; background: transparent;"
+        )
+        area_note_layout.addWidget(self.area_note_label)
+        self.area_note_frame.hide()
+        guide_text_layout.addWidget(self.area_note_frame)
 
         poelab_button_layout = QHBoxLayout()
         poelab_button_layout.setContentsMargins(0, 0, 0, 0)
@@ -4762,6 +4884,42 @@ class MainWindow(QMainWindow):
         self.poelab_link_button.setVisible(self._current_poelab_type is not None)
         if self._current_poelab_type is None:
             self._reset_poelab_link_button()
+
+    def _update_area_note(self, zone_name: str, zone_id: str | None):
+        self._current_zone_id = zone_id
+        self._current_zone_name = zone_name
+        self.area_note_edit_button.setEnabled(bool(zone_id))
+        if not zone_id:
+            self._current_area_note = ""
+            self.area_note_label.clear()
+            self.area_note_frame.hide()
+            return
+        try:
+            content = get_area_note(self.poe_version, zone_id)
+        except ValueError as exc:
+            self._current_area_note = ""
+            self.area_note_label.clear()
+            self.area_note_frame.hide()
+            self.area_note_edit_button.setEnabled(False)
+            QMessageBox.warning(self, "ユーザーメモ読込エラー", str(exc))
+            return
+        self._current_area_note = content
+        self.area_note_label.setText(content.replace("\n", "<br>"))
+        self.area_note_frame.setVisible(bool(content.strip()))
+
+    def open_area_note_editor(self):
+        zone_id = self._current_zone_id
+        if not zone_id:
+            return
+        dialog = AreaNoteDialog(self, self._current_zone_name or zone_id, self._current_area_note)
+        if dialog.exec() != QDialog.Accepted:
+            return
+        try:
+            set_area_note(self.poe_version, zone_id, dialog.content())
+        except (OSError, ValueError) as exc:
+            QMessageBox.warning(self, "ユーザーメモ保存エラー", str(exc))
+            return
+        self._update_area_note(self._current_zone_name, zone_id)
 
     def open_daily_poelab(self):
         """当日のDaily Notes URLだけを取得し、標準ブラウザで開く。"""
@@ -5982,6 +6140,7 @@ class MainWindow(QMainWindow):
 
     def _update_guide_and_map(self, zone_name: str, zone_id: str | None, visit_num: int, zone_changed: bool = False, exp_level: int | None = None):
         """攻略ガイドとマップ画像を更新"""
+        self._update_area_note(zone_name, zone_id)
         self._update_poelab_link_visibility(zone_id)
         # 訪問回数オーバーライド適用
         effective_visit = self.visit_override if self.visit_override is not None else visit_num
