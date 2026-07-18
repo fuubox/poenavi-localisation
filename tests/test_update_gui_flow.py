@@ -61,6 +61,14 @@ def test_show_event_state_exists_before_startup_update_gate():
     assert observed == {"pending_map": False, "positioned": False}
 
 
+def test_show_event_state_exists_before_python_init_body():
+    """Qt may dispatch showEvent from QMainWindow.__init__ itself."""
+    window = MainWindow.__new__(MainWindow)
+
+    assert window._pending_initial_map_auto_open is False
+    assert window._initial_positioned is False
+
+
 def test_startup_check_skips_already_notified_release():
     window = MainWindow.__new__(MainWindow)
     window.config = {"notified_update_version": "2.5.0"}

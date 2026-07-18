@@ -3172,6 +3172,11 @@ class VendorSearchPresetDialog(QDialog):
 
 
 class MainWindow(QMainWindow):
+    # Qt may call an overridden showEvent from QMainWindow.__init__ before
+    # this class' __init__ body can initialize instance attributes.
+    _initial_positioned = False
+    _pending_initial_map_auto_open = False
+
     POELAB_ZONE_TYPES = {
         "act4_area3": "normal",
         "act8_area2": "cruel",
@@ -6676,7 +6681,7 @@ class MainWindow(QMainWindow):
             
     def showEvent(self, event):
         super().showEvent(event)
-        if not self._initial_positioned:
+        if not getattr(self, "_initial_positioned", False):
             self._initial_positioned = True
             from PySide6.QtWidgets import QApplication
             
@@ -6734,7 +6739,7 @@ class MainWindow(QMainWindow):
                 # デフォルト: 右端配置
                 self._position_right_edge()
 
-            if self._pending_initial_map_auto_open:
+            if getattr(self, "_pending_initial_map_auto_open", False):
                 self._pending_initial_map_auto_open = False
                 QTimer.singleShot(50, self.map_thumbnail.open_first_map)
     
