@@ -3,7 +3,12 @@ import json
 
 import pytest
 
-from src.update.release_client import fetch_latest_release, parse_latest_release, parse_version
+from src.update.release_client import (
+    RELEASES_API,
+    fetch_latest_release,
+    parse_latest_release,
+    parse_version,
+)
 
 
 def release_payload(tag="v2.5.0", *, draft=False, prerelease=False, assets=None):
@@ -86,5 +91,36 @@ def test_fetch_latest_release_sends_user_agent_and_timeout():
     release = fetch_latest_release("2.4.0", opener=opener)
     assert release is not None
     assert release.version == "2.5.0"
+    assert calls[0][0].full_url == RELEASES_API
     assert calls[0][0].get_header("User-agent") == "PoENavi-Updater"
     assert calls[0][1] == 10
+
+
+def test_fetch_test_release_uses_tag_endpoint_and_allows_prerelease(monkeypatch):
+    calls = []
+
+    class Response(io.BytesIO):
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            self.close()
+
+    def opener(request, timeout):
+        calls.append((request, timeout))
+        payload = release_payload(prerelease=True)
+        return Response(json.dumps(payload).encode("utf-8"))
+
+    monkeypatch.setenv("POENAVI_UPDATE_TEST_TAG", "v2.5.0")
+    release = fetch_latest_release("2.4.0", opener=opener)
+
+    assert release is not None
+    assert release.version == "2.5.0"
+    assert calls[0][0].full_url.endswith("/releases/tags/v2.5.0")
+
+
+def test_fetch_test_release_rejects_invalid_environment_tag(monkeypatch):
+    monkeypatch.setenv("POENAVI_UPDATE_TEST_TAG", "../../latest")
+
+    with pytest.raises(ValueError):
+        fetch_latest_release("2.4.0", opener=lambda *_args, **_kwargs: None)
