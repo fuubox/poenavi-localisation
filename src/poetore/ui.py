@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
+    QAbstractItemView,
     QApplication, QHBoxLayout, QLabel, QMessageBox, QPushButton, QSplitter,
-    QTreeWidget, QTreeWidgetItem, QVBoxLayout, QWidget, QPlainTextEdit,
+    QTreeWidget, QTreeWidgetItem, QVBoxLayout, QWidget, QPlainTextEdit, QHeaderView,
 )
 
 from .parser import ItemParseError, parse_item_text
@@ -37,9 +38,16 @@ class PoetoreWindow(QWidget):
         splitter.addWidget(self.input_edit)
         self.result_tree = QTreeWidget()
         self.result_tree.setHeaderLabels(["項目", "解析結果"])
+        self.result_tree.setAlternatingRowColors(True)
+        self.result_tree.setRootIsDecorated(True)
+        self.result_tree.setUniformRowHeights(True)
+        self.result_tree.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        header = self.result_tree.header()
+        header.setSectionResizeMode(0, QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(1, QHeaderView.Stretch)
         splitter.addWidget(self.result_tree)
         splitter.setSizes([430, 430])
-        layout.addWidget(splitter)
+        layout.addWidget(splitter, stretch=1)
 
     def paste_from_clipboard(self):
         self.input_edit.setPlainText(QApplication.clipboard().text())
@@ -67,6 +75,7 @@ class PoetoreWindow(QWidget):
             values = ", ".join(f"{value:g}" for value in mod.values)
             QTreeWidgetItem(modifiers, [mod.kind, f"{mod.text}" + (f"  [{values}]" if values else "")])
         self.result_tree.expandAll()
+        self.result_tree.scrollToTop()
 
 
 def show_poetore_window(owner):

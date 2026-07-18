@@ -48,6 +48,55 @@ class PoetoreParserTest(unittest.TestCase):
         with self.assertRaises(ItemParseError):
             parse_item_text("ただの文章です")
 
+    def test_weapon_properties_and_requirements_are_not_modifiers(self):
+        item = parse_item_text("""Item Class: Bows
+Rarity: Rare
+Storm Reach
+Spine Bow
+--------
+Bow
+Physical Damage: 38-115 (augmented)
+Critical Strike Chance: 6.50%
+Attacks per Second: 1.50
+--------
+Requirements:
+Level: 64
+Dexterity: 212
+--------
+Sockets: G-G-G-G-G-G
+--------
+Item Level: 84
+--------
++24% to Global Critical Strike Multiplier (implicit)
+--------
+{ Prefix Modifier "Vicious" (Tier: 3) }
+120% increased Physical Damage
+{ Suffix Modifier "of the Lynx" (Tier: 2) }
++31 to Dexterity
+""")
+        self.assertEqual(len(item.modifiers), 3)
+        self.assertEqual([mod.kind for mod in item.modifiers], ["implicit", "prefix", "suffix"])
+        self.assertIn("Physical Damage", item.properties)
+        self.assertIn("Requirements", item.properties)
+        self.assertNotIn("Bow", [mod.text for mod in item.modifiers])
+
+    def test_modifier_header_is_not_counted_as_a_modifier(self):
+        item = parse_item_text("""Item Class: Rings
+Rarity: Rare
+Coil Band
+Gold Ring
+--------
+Requirements:
+Level: 40
+--------
+Item Level: 70
+--------
+{ Crafted Prefix Modifier }
++45 to maximum Life (crafted)
+""")
+        self.assertEqual(len(item.modifiers), 1)
+        self.assertEqual(item.modifiers[0].kind, "crafted")
+
 
 if __name__ == "__main__":
     unittest.main()

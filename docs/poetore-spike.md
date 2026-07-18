@@ -10,6 +10,13 @@
 - Trade APIへの実通信、ホットキー、検索結果UI、日本語Modマスタは次段階。未確認の
   API仕様やデータを今回の正本には入れていない。
 
+## Windows実機確認後の改善
+
+- 武器性能、装備条件、ソケットなど、アイテムレベル以前の区画をModから除外。
+- 詳細コピーに含まれるPrefix / Suffix / Crafted等の見出しは件数へ含めず、次のModへ
+  種別として付与する。
+- 解析結果は項目列を内容幅、結果列を残り幅にし、解析後は必ず先頭から表示する。
+
 ## Awakened PoE Tradeから確認したこと
 
 - 参照先: <https://github.com/SnosMe/awakened-poe-trade>

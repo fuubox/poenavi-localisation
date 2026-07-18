@@ -23,7 +23,10 @@ _PROPERTY_LABELS = {
     "元素ダメージ", "Elemental Damage", "クリティカル率", "Critical Strike Chance",
     "秒間アタック回数", "Attacks per Second", "装備条件", "Requirements",
     "ソケット", "Sockets", "スタックサイズ", "Stack Size", "マップティア", "Map Tier",
-    "ジェムレベル", "Level", "経験値", "Experience",
+    "ジェムレベル", "Level", "経験値", "Experience", "筋力", "Strength",
+    "器用さ", "Dexterity", "知性", "Intelligence", "Spirit", "スピリット",
+    "ブロック率", "Chance to Block", "移動速度", "Movement Speed",
+    "ルーンソケット", "Rune Sockets",
 }
 _FLAG_LINES = {
     "未鑑定": "unidentified", "Unidentified": "unidentified",
@@ -42,6 +45,10 @@ _CATEGORY_WORDS = (
     (("カード", "Divination Card"), "divination_card"),
 )
 _NUMBER = re.compile(r"(?<![A-Za-z])[-+]?\d+(?:\.\d+)?")
+_MODIFIER_HEADER = re.compile(
+    r"^\{.*?\b(?P<kind>Prefix|Suffix|Implicit|Enchant|Crafted|Fractured|Desecrated)\b.*\}$",
+    re.IGNORECASE,
+)
 
 
 def _sections(text: str) -> list[list[str]]:
@@ -111,7 +118,11 @@ def parse_item_text(text: str) -> ParsedItem:
     modifiers: list[ItemModifier] = []
     item_level = None
 
-    for section_index, section in enumerate(sections[1:], 1):
+    reached_item_level = False
+    pending_kind: str | None = None
+    for section in sections[1:]:
+        # 装備性能・装備条件など、item levelより前の区画は検索Modではない。
+        metadata_section = not reached_item_level
         for line in section:
             if line in _FLAG_LINES:
                 flags.append(_FLAG_LINES[line])
@@ -123,12 +134,30 @@ def parse_item_text(text: str) -> ParsedItem:
                 if mapped == "item_level":
                     level_match = re.search(r"\d+", value)
                     item_level = int(level_match.group()) if level_match else None
+                    reached_item_level = True
                     continue
-                if label in _PROPERTY_LABELS or section_index == 1:
+                if label in _PROPERTY_LABELS or metadata_section:
                     properties[label] = value
                     continue
-            kind = "implicit" if "(implicit)" in line.lower() or "（暗黙）" in line else "explicit"
+            if metadata_section:
+                # 「Bow」「両手剣」のような値を持たない性能区画の見出しも保持する。
+                properties.setdefault(line, "")
+                continue
+            header_match = _MODIFIER_HEADER.match(line)
+            if header_match:
+                pending_kind = header_match.group("kind").lower()
+                continue
+            lowered = line.lower()
+            if "(implicit)" in lowered or "（暗黙）" in line:
+                kind = "implicit"
+            elif "(enchant)" in lowered or "（エンチャント）" in line:
+                kind = "enchant"
+            elif "(crafted)" in lowered or "（クラフト）" in line:
+                kind = "crafted"
+            else:
+                kind = pending_kind or "explicit"
             modifiers.append(ItemModifier(text=line, values=_numbers(line), kind=kind))
+            pending_kind = None
 
     return ParsedItem(
         item_class=header.get("item_class", ""), rarity=rarity, name=name,
