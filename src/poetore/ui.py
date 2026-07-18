@@ -15,7 +15,7 @@ class PoetoreWindow(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent, Qt.Window)
-        self.setWindowTitle("ぽえとれ（ローカル試作）")
+        self.setWindowTitle("ぽえとれ（ローカル試作・日本語名対応版）")
         self.resize(860, 620)
         layout = QVBoxLayout(self)
         note = QLabel("PoEで詳細コピーしたアイテム文章を貼り付けて解析します。価格検索APIは未接続です。")

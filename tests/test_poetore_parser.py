@@ -57,6 +57,35 @@ Corsair Sword
         self.assertEqual(item.name, "地獄の破滅")
         self.assertEqual(item.base_type, "略奪者の剣")
 
+    def test_keeps_japanese_name_and_base_from_actual_clipboard_text(self):
+        item = parse_item_text("""アイテムクラス: 両手剣
+レアリティ: レア
+地獄の破滅
+略奪者の剣
+--------
+両手剣
+物理ダメージ: 108-181 (augmented)
+クリティカル率: 5.00%
+秒間アタック回数: 1.74 (augmented)
+武器攻撃距離：1.3 メートル
+--------
+装備要求:
+レベル: 59
+筋力: 82
+器用さ: 119
+--------
+ソケット: G-R-G
+--------
+アイテムレベル: 67
+--------
+グローバル命中力が60%増加する (implicit)
+--------
+物理ダメージが74%増加する
+アタックスピードが16%増加する
+""")
+        self.assertEqual(item.name, "地獄の破滅")
+        self.assertEqual(item.base_type, "略奪者の剣")
+
     def test_rejects_non_item_text(self):
         with self.assertRaises(ItemParseError):
             parse_item_text("ただの文章です")
