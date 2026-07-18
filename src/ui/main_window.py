@@ -1133,7 +1133,7 @@ class RouteSelectionDialog(QDialog):
         self.setFixedSize(400, 270)
         self.setStyleSheet(Styles.MAIN_WINDOW)
         config = config or {}
-        
+
         layout = QVBoxLayout(self)
         layout.setSpacing(12)
         
@@ -3392,7 +3392,7 @@ class MainWindow(QMainWindow):
         self.update_controller.download_cancelled.connect(self._on_update_download_cancelled)
         self._update_progress_dialog = None
         self._check_for_updates(manual=False)
-        
+
         # エリアメモ導入案内（全モード共通で一度だけ）
         self._show_area_note_migration_notice_once()
 

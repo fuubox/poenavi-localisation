@@ -7,6 +7,10 @@ import pytest
 
 from src.update.artifacts import (
     DownloadCancelled,
+    MAX_ARCHIVE_ENTRIES,
+    MAX_COMPRESSION_RATIO,
+    MAX_SINGLE_FILE_SIZE,
+    MAX_TOTAL_UNCOMPRESSED_SIZE,
     download_file,
     parse_checksum,
     validate_update_archive,
@@ -18,6 +22,13 @@ def write_zip(path: Path, names: list[str]):
     with zipfile.ZipFile(path, "w") as archive:
         for name in names:
             archive.writestr(name, b"content")
+
+
+def test_default_archive_limits_match_release_policy():
+    assert MAX_ARCHIVE_ENTRIES == 5_000
+    assert MAX_TOTAL_UNCOMPRESSED_SIZE == 512 * 1024 * 1024
+    assert MAX_SINGLE_FILE_SIZE == 128 * 1024 * 1024
+    assert MAX_COMPRESSION_RATIO == 100
 
 
 def test_parse_checksum_and_verify_file(tmp_path):
