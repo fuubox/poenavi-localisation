@@ -31,7 +31,7 @@ class PoetoreWindow(QWidget):
         self.setAttribute(Qt.WA_TransparentForMouseEvents, False)
         self.setEnabled(True)
         self.setWindowTitle("ぽえとれ（ローカル試作・価格検索版）")
-        self.resize(860, 620)
+        self.resize(860, 720)
         layout = QVBoxLayout(self)
         note = QLabel("PoEでアイテムにカーソルを合わせて Alt+D。日本語名と詳細Modを合成し、現在のPCリーグの相場を自動検索します。")
         note.setWordWrap(True)
@@ -69,6 +69,18 @@ class PoetoreWindow(QWidget):
         self.price_status = QLabel("価格検索はPoE公式Trade APIのオンライン出品を使います。")
         self.price_status.setWordWrap(True)
         layout.addWidget(self.price_status)
+        self.price_list = QTreeWidget()
+        self.price_list.setHeaderLabels(["#", "価格", "アイテム", "出品者"])
+        self.price_list.setRootIsDecorated(False)
+        self.price_list.setAlternatingRowColors(True)
+        self.price_list.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.price_list.setMinimumHeight(150)
+        price_header = self.price_list.header()
+        price_header.setSectionResizeMode(0, QHeaderView.ResizeToContents)
+        price_header.setSectionResizeMode(1, QHeaderView.ResizeToContents)
+        price_header.setSectionResizeMode(2, QHeaderView.Stretch)
+        price_header.setSectionResizeMode(3, QHeaderView.ResizeToContents)
+        layout.addWidget(self.price_list)
         self._trade_signals = _TradeSignals(self)
         self._trade_signals.completed.connect(self._show_price_result)
         self._trade_signals.failed.connect(self._show_price_error)
@@ -146,6 +158,7 @@ class PoetoreWindow(QWidget):
         if item is None:
             return
         self.price_button.setEnabled(False)
+        self.price_list.clear()
         self.price_status.setText("現在のPCリーグでオンライン出品を検索中…")
 
         def run():
@@ -171,9 +184,18 @@ class PoetoreWindow(QWidget):
             f"{result.league}: 候補{result.total}件 / 取得{len(result.listings)}件 | "
             f"中央値 {medians} | 安値例 {samples}"
         )
+        for index, listing in enumerate(result.listings, start=1):
+            item_label = listing.item_name or listing.base_type or "（名前なし）"
+            if listing.item_name and listing.base_type:
+                item_label = f"{listing.item_name} / {listing.base_type}"
+            QTreeWidgetItem(self.price_list, [
+                str(index), f"{listing.amount:g} {listing.currency}", item_label,
+                listing.account or "-",
+            ])
 
     def _show_price_error(self, message: str):
         self.price_button.setEnabled(True)
+        self.price_list.clear()
         self.price_status.setText(message)
 
 

@@ -23,6 +23,8 @@ class PriceListing:
     amount: float
     currency: str
     account: str = ""
+    item_name: str = ""
+    base_type: str = ""
 
 
 @dataclass(frozen=True)
@@ -109,10 +111,14 @@ def search_prices(item: ParsedItem, trade_base_type: str | None = None, league: 
         fetched, _ = _request_json(f"{API_ROOT}/fetch/{fetch_ids}?query={quote(query_id)}")
         for row in fetched.get("result", ()):
             listing = row.get("listing", {})
+            fetched_item = row.get("item", {})
             price = listing.get("price") or {}
             if price.get("amount") is None or not price.get("currency"):
                 continue
             account = (listing.get("account") or {}).get("name", "")
-            listings.append(PriceListing(float(price["amount"]), str(price["currency"]), str(account)))
+            listings.append(PriceListing(
+                float(price["amount"]), str(price["currency"]), str(account),
+                str(fetched_item.get("name", "")), str(fetched_item.get("baseType", "")),
+            ))
     rate_limit = headers.get("X-Rate-Limit-Ip-State", "") if headers else ""
     return PriceResult(league, query_id, len(ids), tuple(listings), rate_limit)

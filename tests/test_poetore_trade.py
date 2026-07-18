@@ -1,7 +1,9 @@
 from unittest.mock import patch
 
 from src.poetore.parser import parse_item_text
-from src.poetore.trade import PriceListing, PriceResult, active_pc_league, build_search_query, physical_dps
+from src.poetore.trade import (
+    PriceListing, PriceResult, active_pc_league, build_search_query, physical_dps, search_prices,
+)
 
 
 ITEM = """Item Class: Two Hand Swords
@@ -43,3 +45,16 @@ def test_price_result_calculates_median_per_currency():
         PriceListing(3, "chaos"), PriceListing(7, "chaos"), PriceListing(1, "divine")
     ))
     assert result.median_by_currency() == {"chaos": 5, "divine": 1}
+
+
+def test_search_prices_keeps_item_and_seller_for_list_display():
+    search = ({"id": "query1", "result": ["item1"]}, {"X-Rate-Limit-Ip-State": "1:10:0"})
+    fetch = ({"result": [{
+        "listing": {"price": {"amount": 4, "currency": "chaos"}, "account": {"name": "seller"}},
+        "item": {"name": "Doom Sever", "baseType": "Reaver Sword"},
+    }]}, {})
+    with patch("src.poetore.trade._request_json", side_effect=[search, fetch]):
+        result = search_prices(parse_item_text(ITEM), "Reaver Sword", "Mirage")
+    assert result.listings == (
+        PriceListing(4, "chaos", "seller", "Doom Sever", "Reaver Sword"),
+    )

@@ -43,9 +43,14 @@ def test_show_poetore_window_is_independent_from_owner(qapp):
 def test_price_result_is_rendered_in_japanese(qapp):
     window = PoetoreWindow()
     window._show_price_result(PriceResult("Mirage", "q", 42, (
-        PriceListing(4, "chaos"), PriceListing(6, "chaos"),
+        PriceListing(4, "chaos", "seller1", "Doom Sever", "Reaver Sword"),
+        PriceListing(6, "chaos", "seller2", "Foe Bite", "Reaver Sword"),
     )))
     assert "Mirage" in window.price_status.text()
     assert "候補42件" in window.price_status.text()
     assert "中央値 5 chaos" in window.price_status.text()
+    assert window.price_list.topLevelItemCount() == 2
+    assert window.price_list.topLevelItem(0).text(1) == "4 chaos"
+    assert window.price_list.topLevelItem(0).text(2) == "Doom Sever / Reaver Sword"
+    assert window.price_list.topLevelItem(0).text(3) == "seller1"
     window.close()
