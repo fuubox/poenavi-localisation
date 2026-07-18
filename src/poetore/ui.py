@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from PySide6.QtCore import Qt, QTimer
+import threading
+
+from PySide6.QtCore import QObject, Qt, QTimer, Signal
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QApplication, QHBoxLayout, QLabel, QMessageBox, QPushButton, QSplitter,
@@ -10,6 +12,12 @@ from PySide6.QtWidgets import (
 from .parser import ItemParseError, parse_item_text
 from .clipboard import read_item_clipboard
 from .merge import merge_normal_and_detailed_copy
+from .trade import PriceResult, TradeApiError, search_prices
+
+
+class _TradeSignals(QObject):
+    completed = Signal(object)
+    failed = Signal(str)
 
 
 class PoetoreWindow(QWidget):
@@ -22,10 +30,10 @@ class PoetoreWindow(QWidget):
         self.setWindowFlag(Qt.WindowTransparentForInput, False)
         self.setAttribute(Qt.WA_TransparentForMouseEvents, False)
         self.setEnabled(True)
-        self.setWindowTitle("ぽえとれ（ローカル試作・Alt+D対応版）")
+        self.setWindowTitle("ぽえとれ（ローカル試作・価格検索版）")
         self.resize(860, 620)
         layout = QVBoxLayout(self)
-        note = QLabel("PoEでアイテムにカーソルを合わせて Alt+D。日本語名と詳細Modを自動で合成します。価格検索APIは未接続です。")
+        note = QLabel("PoEでアイテムにカーソルを合わせて Alt+D。日本語名と詳細Modを合成し、現在のPCリーグの相場を自動検索します。")
         note.setWordWrap(True)
         layout.addWidget(note)
 
@@ -36,6 +44,9 @@ class PoetoreWindow(QWidget):
         parse_button = QPushButton("解析")
         parse_button.clicked.connect(self.parse_current_text)
         buttons.addWidget(parse_button)
+        self.price_button = QPushButton("価格を検索")
+        self.price_button.clicked.connect(self.search_current_item)
+        buttons.addWidget(self.price_button)
         buttons.addStretch()
         layout.addLayout(buttons)
 
@@ -55,8 +66,16 @@ class PoetoreWindow(QWidget):
         splitter.addWidget(self.result_tree)
         splitter.setSizes([430, 430])
         layout.addWidget(splitter, stretch=1)
+        self.price_status = QLabel("価格検索はPoE公式Trade APIのオンライン出品を使います。")
+        self.price_status.setWordWrap(True)
+        layout.addWidget(self.price_status)
+        self._trade_signals = _TradeSignals(self)
+        self._trade_signals.completed.connect(self._show_price_result)
+        self._trade_signals.failed.connect(self._show_price_error)
+        self._trade_base_type = None
 
     def paste_from_clipboard(self):
+        self._trade_base_type = None
         self.input_edit.setPlainText(read_item_clipboard(QApplication.clipboard()))
         self.parse_current_text()
 
@@ -82,17 +101,21 @@ class PoetoreWindow(QWidget):
     def _capture_detailed_copy(self):
         detailed_text = read_item_clipboard(QApplication.clipboard())
         try:
+            detailed_item = parse_item_text(detailed_text)
             merged_text = merge_normal_and_detailed_copy(self._normal_copy_text, detailed_text)
         except ItemParseError as exc:
             QMessageBox.warning(self, "取り込めませんでした", f"PoEのアイテムコピーを取得できませんでした。\n{exc}")
             return
+        self._trade_base_type = detailed_item.base_type
         self.input_edit.setPlainText(merged_text)
         self.parse_current_text()
         self.show()
         self.raise_()
         self.activateWindow()
+        self.search_current_item()
 
     def parse_current_text(self):
+        self._parsed_item = None
         try:
             item = parse_item_text(self.input_edit.toPlainText())
         except ItemParseError as exc:
@@ -115,6 +138,43 @@ class PoetoreWindow(QWidget):
             QTreeWidgetItem(modifiers, [mod.kind, f"{mod.text}" + (f"  [{values}]" if values else "")])
         self.result_tree.expandAll()
         self.result_tree.scrollToTop()
+        self._parsed_item = item
+
+    def search_current_item(self):
+        self.parse_current_text()
+        item = getattr(self, "_parsed_item", None)
+        if item is None:
+            return
+        self.price_button.setEnabled(False)
+        self.price_status.setText("現在のPCリーグでオンライン出品を検索中…")
+
+        def run():
+            try:
+                result = search_prices(item, self._trade_base_type)
+            except TradeApiError as exc:
+                self._trade_signals.failed.emit(str(exc))
+            else:
+                self._trade_signals.completed.emit(result)
+
+        threading.Thread(target=run, daemon=True).start()
+
+    def _show_price_result(self, result: PriceResult):
+        self.price_button.setEnabled(True)
+        if not result.listings:
+            self.price_status.setText(f"{result.league}: 検索候補{result.total}件。価格付き出品は取得できませんでした。")
+            return
+        medians = " / ".join(
+            f"{value:g} {currency}" for currency, value in result.median_by_currency().items()
+        )
+        samples = ", ".join(f"{row.amount:g} {row.currency}" for row in result.listings[:5])
+        self.price_status.setText(
+            f"{result.league}: 候補{result.total}件 / 取得{len(result.listings)}件 | "
+            f"中央値 {medians} | 安値例 {samples}"
+        )
+
+    def _show_price_error(self, message: str):
+        self.price_button.setEnabled(True)
+        self.price_status.setText(message)
 
 
 def show_poetore_window(owner, activate=True):
