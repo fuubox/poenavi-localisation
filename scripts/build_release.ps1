@@ -89,9 +89,13 @@ if (-not (Test-Path dist\PoENavi\PoENaviUpdater.exe)) {
 Remove-Item PoENavi.zip, PoENavi.zip.sha256 -ErrorAction SilentlyContinue
 $zipCreated = $false
 $zipAttempts = 60
+$zipCode = "import shutil; shutil.make_archive('PoENavi', 'zip', root_dir='dist', base_dir='PoENavi')"
 for ($attempt = 1; $attempt -le $zipAttempts; $attempt++) {
     try {
-        Compress-Archive -Path dist\PoENavi -DestinationPath PoENavi.zip -ErrorAction Stop
+        & $Python -c $zipCode
+        if ($LASTEXITCODE -ne 0) {
+            throw "ZIP creation failed with exit code $LASTEXITCODE"
+        }
         $zipCreated = $true
         break
     }

@@ -60,6 +60,34 @@ def test_validate_update_archive_accepts_release_layout(tmp_path):
     validate_update_archive(archive)
 
 
+def test_validate_update_archive_accepts_build_script_root_layout(tmp_path):
+    archive = tmp_path / "PoENavi.zip"
+    write_zip(
+        archive,
+        [
+            "PoENavi.exe",
+            "PoENaviUpdater.exe",
+            "_internal/guide_data.json",
+        ],
+    )
+    validate_update_archive(archive)
+
+
+def test_validate_update_archive_rejects_ambiguous_mixed_layout(tmp_path):
+    archive = tmp_path / "PoENavi.zip"
+    write_zip(
+        archive,
+        [
+            "PoENavi.exe",
+            "PoENaviUpdater.exe",
+            "PoENavi/PoENavi.exe",
+            "PoENavi/PoENaviUpdater.exe",
+        ],
+    )
+    with pytest.raises(ValueError, match="配置が不正"):
+        validate_update_archive(archive)
+
+
 def test_validate_update_archive_rejects_too_many_entries(tmp_path):
     archive = tmp_path / "PoENavi.zip"
     write_zip(

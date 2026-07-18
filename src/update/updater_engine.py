@@ -65,7 +65,12 @@ def apply_update(
     with zipfile.ZipFile(archive) as bundle:
         bundle.extractall(stage)
 
-    replacement = stage / "PoENavi"
+    wrapped_replacement = stage / "PoENavi"
+    replacement = (
+        wrapped_replacement
+        if (wrapped_replacement / "PoENavi.exe").is_file()
+        else stage
+    )
     if not (replacement / "PoENavi.exe").is_file():
         raise UpdateApplyError("更新後の PoENavi.exe がありません")
 

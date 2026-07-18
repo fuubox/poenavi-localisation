@@ -107,9 +107,13 @@ def validate_update_archive(
     max_compression_ratio: float = MAX_COMPRESSION_RATIO,
     min_ratio_check_size: int = MIN_RATIO_CHECK_SIZE,
 ) -> None:
-    required = {
+    wrapped_required = {
         "PoENavi/PoENavi.exe",
         "PoENavi/PoENaviUpdater.exe",
+    }
+    root_required = {
+        "PoENavi.exe",
+        "PoENaviUpdater.exe",
     }
     with zipfile.ZipFile(path) as archive:
         entries = archive.infolist()
@@ -126,7 +130,6 @@ def validate_update_archive(
             parts = pure_path.parts
             if (
                 not parts
-                or parts[0] != "PoENavi"
                 or ".." in parts
                 or pure_path.is_absolute()
                 or re.match(r"^[A-Za-z]:", name)
@@ -152,8 +155,10 @@ def validate_update_archive(
                     )
             names.add(name.rstrip("/"))
 
-    missing = required - names
-    if missing:
+    has_wrapped_layout = wrapped_required <= names
+    has_root_layout = root_required <= names
+    if has_wrapped_layout == has_root_layout:
         raise ValueError(
-            f"更新 ZIP に必須ファイルがありません: {', '.join(sorted(missing))}"
+            "更新 ZIP の配置が不正です: PoENavi.exe と "
+            "PoENaviUpdater.exe が同じ階層に必要です"
         )

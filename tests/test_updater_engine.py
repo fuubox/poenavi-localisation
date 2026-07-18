@@ -19,6 +19,12 @@ def make_release(path: Path, marker="new", guide="new guide"):
         archive.writestr("PoENavi/guide_data.json", guide)
 
 
+def make_root_release(path: Path, marker="new"):
+    with zipfile.ZipFile(path, "w") as archive:
+        archive.writestr("PoENavi.exe", marker)
+        archive.writestr("PoENaviUpdater.exe", "updater")
+
+
 def test_wait_for_process_exit_stops_when_process_finishes():
     states = iter([True, True, False])
     assert wait_for_process_exit(
@@ -80,6 +86,18 @@ def test_apply_update_replaces_install_and_launches_new_exe(tmp_path):
     assert (install / "PoENavi.exe").read_text(encoding="utf-8") == "new"
     assert launched == [install / "PoENavi.exe"]
     assert backup.exists()
+
+
+def test_apply_update_accepts_build_script_root_layout(tmp_path):
+    install = tmp_path / "PoENavi"
+    install.mkdir()
+    (install / "PoENavi.exe").write_text("old", encoding="utf-8")
+    archive = tmp_path / "PoENavi.zip"
+    make_root_release(archive)
+
+    apply_update(archive, install, tmp_path / "work", lambda _exe: object())
+
+    assert (install / "PoENavi.exe").read_text(encoding="utf-8") == "new"
 
 
 def test_apply_update_replaces_old_official_guide_with_release_guide(tmp_path):
