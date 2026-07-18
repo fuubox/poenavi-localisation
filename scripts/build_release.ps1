@@ -87,7 +87,27 @@ if (-not (Test-Path dist\PoENavi\PoENaviUpdater.exe)) {
 }
 
 Remove-Item PoENavi.zip, PoENavi.zip.sha256 -ErrorAction SilentlyContinue
-Compress-Archive -Path dist\PoENavi -DestinationPath PoENavi.zip
+$zipCreated = $false
+for ($attempt = 1; $attempt -le 10; $attempt++) {
+    try {
+        Compress-Archive -Path dist\PoENavi -DestinationPath PoENavi.zip -ErrorAction Stop
+        $zipCreated = $true
+        break
+    }
+    catch {
+        Remove-Item PoENavi.zip -ErrorAction SilentlyContinue
+        if ($attempt -eq 10) {
+            throw
+        }
+
+        Write-Warning "ZIP creation failed (attempt $attempt/10). Waiting for file scanning to finish..."
+        Start-Sleep -Seconds 3
+    }
+}
+
+if (-not $zipCreated) {
+    throw "PoENavi.zip was not created"
+}
 $hash = (Get-FileHash PoENavi.zip -Algorithm SHA256).Hash.ToLower()
 Set-Content -Path PoENavi.zip.sha256 -Value "$hash  PoENavi.zip" -Encoding ascii
 
