@@ -22,22 +22,9 @@ if ($Python -eq ".venv-build\Scripts\python.exe" -and -not (Test-Path $Python)) 
 }
 
 Invoke-Python -m pip install --upgrade pip setuptools wheel
-Invoke-Python -m pip install --upgrade -r requirements.txt pyinstaller pytest pillow
+Invoke-Python -m pip install --upgrade -r requirements.txt pyinstaller pytest
 
 Remove-Item -Recurse -Force build, dist -ErrorAction SilentlyContinue
-New-Item -ItemType Directory -Force build\generated | Out-Null
-
-$iconCode = @"
-from pathlib import Path
-from PIL import Image, ImageOps
-source = Image.open(Path('assets/app/updater.png')).convert('RGBA')
-icon = ImageOps.fit(source, (256, 256), method=Image.Resampling.LANCZOS)
-icon.save(Path('build/generated/updater.ico'), sizes=[(16, 16), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)])
-"@
-& $Python -c $iconCode
-if ($LASTEXITCODE -ne 0) {
-    throw "Failed to generate updater.ico"
-}
 
 $appArgs = @(
     "-m", "PyInstaller",
@@ -69,7 +56,7 @@ $updaterArgs = @(
     "-m", "PyInstaller",
     "--noconfirm", "--clean", "--noupx", "--onefile", "--windowed",
     "--name", "PoENaviUpdater",
-    "--icon", "build\generated\updater.ico",
+    "--icon", "assets\app\updater.ico",
     "--distpath", "dist\PoENavi",
     "--workpath", "build\updater",
     "--hidden-import", "PySide6.QtWidgets",
