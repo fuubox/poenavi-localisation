@@ -7,6 +7,7 @@ pytest.importorskip("PySide6")
 from PySide6.QtWidgets import QApplication, QMessageBox
 
 from src.ui.main_window import MainWindow
+from src.update.qt_controller import UpdateController
 from src.update.release_client import ReleaseInfo
 
 
@@ -23,6 +24,25 @@ def release_info():
         "https://github.com/a.zip",
         "https://github.com/a.sha256",
     )
+
+
+class ImmediateThread:
+    def __init__(self, target):
+        self.target = target
+
+    def start(self):
+        self.target()
+
+
+def test_startup_gate_finishes_before_setup_when_no_update():
+    window = MainWindow.__new__(MainWindow)
+    window.config = {}
+    window.update_controller = UpdateController(
+        thread_factory=lambda target: ImmediateThread(target)
+    )
+
+    with patch("src.update.qt_controller.fetch_latest_release", return_value=None):
+        assert window._run_startup_update_gate() is True
 
 
 def test_startup_check_skips_already_notified_release():

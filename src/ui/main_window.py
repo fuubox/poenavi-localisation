@@ -8,7 +8,7 @@ from pynput import keyboard as pynput_keyboard
 from PySide6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
                                QLabel, QPushButton, QMenu, QFrame, QScrollArea, QSplitter,
                                QSizeGrip, QMessageBox, QRadioButton, QButtonGroup, QApplication)
-from PySide6.QtCore import Qt, QTimer, Signal, QRect, QEvent, QPoint, QSize, QMimeData, QUrl
+from PySide6.QtCore import Qt, QTimer, Signal, QRect, QEvent, QEventLoop, QPoint, QSize, QMimeData, QUrl
 from PySide6.QtGui import QCursor, QMouseEvent, QIcon, QDesktopServices
 from src.ui.styles import Styles
 from src.ui.settings_dialog import AreaNoteDialog, SettingsDialog
@@ -3213,6 +3213,12 @@ class MainWindow(QMainWindow):
         
         # 設定読み込み
         self.config = ConfigManager.load_config()
+        self.update_controller = UpdateController(self)
+        self._update_progress_dialog = None
+        if not self._run_startup_update_gate():
+            QTimer.singleShot(0, QApplication.instance().quit)
+            return
+        self._connect_update_controller()
         if not self._ensure_poe_version_selected():
             from PySide6.QtWidgets import QApplication
             QTimer.singleShot(0, QApplication.instance().quit)
@@ -3382,26 +3388,11 @@ class MainWindow(QMainWindow):
         # タイマー状態復元
         self._restore_timer_state()
         
-        # 更新チェック（バックグラウンド）
-        self.update_controller = UpdateController(self)
-        self.update_controller.check_finished.connect(self._on_update_check_finished)
-        self.update_controller.check_failed.connect(self._on_update_check_failed)
-        self.update_controller.download_progress.connect(self._on_update_download_progress)
-        self.update_controller.download_ready.connect(self._on_update_download_ready)
-        self.update_controller.download_failed.connect(self._on_update_download_failed)
-        self.update_controller.download_cancelled.connect(self._on_update_download_cancelled)
-        self._update_progress_dialog = None
-
         # エリアメモ導入案内（全モード共通で一度だけ）
         self._show_area_note_migration_notice_once()
 
         # 初回起動チェック（ポップアップ + ガイドエリア案内）
         self._check_first_run()
-
-        # 起動時案内のモーダルダイアログをすべて閉じてから更新を確認する。
-        # 先に確認すると、更新完了時の終了処理が初回設定ダイアログの
-        # ネストしたイベントループに阻まれ、旧プロセスが残ることがある。
-        self._check_for_updates(manual=False)
         
         # 全ウィジェットのマウスイベントを横取りしてリサイズ処理
         from PySide6.QtWidgets import QApplication
@@ -3410,6 +3401,111 @@ class MainWindow(QMainWindow):
         self._ef_resize_edge = None
         self._ef_resize_start_geo = None
         self._ef_resize_start_pos = None
+
+    def _connect_update_controller(self):
+        """Connect handlers used after the startup update gate."""
+        self.update_controller.check_finished.connect(self._on_update_check_finished)
+        self.update_controller.check_failed.connect(self._on_update_check_failed)
+        self.update_controller.download_progress.connect(self._on_update_download_progress)
+        self.update_controller.download_ready.connect(self._on_update_download_ready)
+        self.update_controller.download_failed.connect(self._on_update_download_failed)
+        self.update_controller.download_cancelled.connect(self._on_update_download_cancelled)
+
+    def _run_startup_update_gate(self):
+        """Finish the startup update decision before showing setup dialogs."""
+        check_loop = QEventLoop()
+        result = {"release": None, "error": None}
+
+        def on_finished(release, _manual):
+            result["release"] = release
+            check_loop.quit()
+
+        def on_failed(message, _manual):
+            result["error"] = message
+            check_loop.quit()
+
+        self.update_controller.check_finished.connect(on_finished)
+        self.update_controller.check_failed.connect(on_failed)
+        QTimer.singleShot(0, lambda: self.update_controller.check(False))
+        check_loop.exec()
+        self.update_controller.check_finished.disconnect(on_finished)
+        self.update_controller.check_failed.disconnect(on_failed)
+
+        release = result["release"]
+        if release is None:
+            return True
+        if self.config.get("notified_update_version") == release.version:
+            return True
+
+        self.config["notified_update_version"] = release.version
+        ConfigManager.save_config(self.config)
+        supported = getattr(sys, "frozen", False) and sys.platform == "win32"
+        dialog = UpdateAvailableDialog(release, supported, self)
+        if not dialog.exec():
+            return True
+        if not supported:
+            QDesktopServices.openUrl(QUrl(release.page_url))
+            return True
+
+        progress = UpdateProgressDialog(release.version, self)
+        progress.cancel_requested.connect(self.update_controller.cancel_download)
+        download_loop = QEventLoop()
+        download_result = {"archive": None, "error": None, "cancelled": False}
+
+        def on_progress(done, total):
+            progress.set_progress(done, total)
+
+        def on_ready(archive, _release):
+            download_result["archive"] = archive
+            download_loop.quit()
+
+        def on_download_failed(message):
+            download_result["error"] = message
+            download_loop.quit()
+
+        def on_cancelled():
+            download_result["cancelled"] = True
+            download_loop.quit()
+
+        self.update_controller.download_progress.connect(on_progress)
+        self.update_controller.download_ready.connect(on_ready)
+        self.update_controller.download_failed.connect(on_download_failed)
+        self.update_controller.download_cancelled.connect(on_cancelled)
+        progress.show()
+        QTimer.singleShot(0, lambda: self.update_controller.download(release))
+        download_loop.exec()
+        progress.close()
+        self.update_controller.download_progress.disconnect(on_progress)
+        self.update_controller.download_ready.disconnect(on_ready)
+        self.update_controller.download_failed.disconnect(on_download_failed)
+        self.update_controller.download_cancelled.disconnect(on_cancelled)
+
+        if download_result["cancelled"]:
+            return True
+        if download_result["error"]:
+            QMessageBox.warning(
+                self,
+                "アップデート",
+                f"更新をダウンロードできませんでした。\n{download_result['error']}",
+            )
+            return True
+
+        answer = QMessageBox.question(
+            self,
+            "アップデートを適用",
+            f"v{release.version} の検証が完了しました。\n"
+            "ぽえなびを終了して更新しますか？",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.Yes,
+        )
+        if answer != QMessageBox.Yes:
+            return True
+        try:
+            self.update_controller.launch_updater(download_result["archive"])
+        except Exception as exc:
+            QMessageBox.critical(self, "アップデート", str(exc))
+            return True
+        return False
         
     def _ensure_poe_version_selected(self):
         mode = self.config.get("poe_version_mode", "ask")
