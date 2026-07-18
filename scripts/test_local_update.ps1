@@ -11,13 +11,13 @@ $notesPath = Join-Path $userDataDir "area_notes_poe1.json"
 $oldGuideMarker = "LOCAL_UPDATE_TEST_OLD_GUIDE"
 
 if (-not (Test-Path (Join-Path $releaseDir "PoENavi.exe"))) {
-    throw "dist\PoENavi\PoENavi.exe がありません。先に build_exe.bat を実行してください。"
+    throw "dist\PoENavi\PoENavi.exe was not found. Run build_exe.bat first."
 }
 if (-not (Test-Path (Join-Path $releaseDir "PoENaviUpdater.exe"))) {
-    throw "dist\PoENavi\PoENaviUpdater.exe がありません。先に build_exe.bat を実行してください。"
+    throw "dist\PoENavi\PoENaviUpdater.exe was not found. Run build_exe.bat first."
 }
 if (-not (Test-Path $archive)) {
-    throw "PoENavi.zip がありません。先に build_exe.bat を実行してください。"
+    throw "PoENavi.zip was not found. Run build_exe.bat first."
 }
 
 Remove-Item $testRoot -Recurse -Force -ErrorAction SilentlyContinue
@@ -26,19 +26,19 @@ New-Item $userDataDir -ItemType Directory -Force | Out-Null
 New-Item $workDir -ItemType Directory -Force | Out-Null
 Copy-Item $releaseDir $installDir -Recurse
 
-# 旧版だけに存在するガイド内容を作り、更新後に公式版へ置換されたことを確認する。
+# Create an old-only guide marker and verify that the update replaces it.
 [IO.File]::WriteAllText(
     (Join-Path $installDir "guide_data.json"),
     $oldGuideMarker,
     [Text.UTF8Encoding]::new($false)
 )
 
-# 実際のエリアメモ形式で隔離ユーザーデータを用意する。
+# Prepare isolated user data in the real area-note format.
 $noteJson = @'
 {
   "schema": 1,
   "notes": {
-    "act1_area1": "ローカル更新テスト用メモ"
+    "act1_area1": "LOCAL UPDATE TEST NOTE"
   }
 }
 '@
@@ -70,26 +70,25 @@ finally {
 }
 
 if ($process.ExitCode -ne 0) {
-    throw "アップデーターが終了コード $($process.ExitCode) で失敗しました。"
+    throw "Updater failed with exit code $($process.ExitCode)."
 }
 if (-not (Test-Path (Join-Path $installDir "PoENavi.exe"))) {
-    throw "更新後のPoENavi.exeがありません。"
+    throw "PoENavi.exe was not found after the update."
 }
 if ((Get-Content (Join-Path $installDir "guide_data.json") -Raw) -eq $oldGuideMarker) {
-    throw "旧公式ガイドが更新版へ置換されていません。"
+    throw "The old official guide was not replaced."
 }
 if (-not (Test-Path $notesPath)) {
-    throw "更新後にエリアメモが失われました。"
+    throw "The area-note file was lost during the update."
 }
 $notesHashAfter = (Get-FileHash $notesPath -Algorithm SHA256).Hash
 if ($notesHashAfter -ne $notesHashBefore) {
-    throw "更新中にエリアメモが変更されました。"
+    throw "The area-note file changed during the update."
 }
 
 Write-Host ""
 Write-Host "LOCAL UPDATE TEST SUCCESS" -ForegroundColor Green
-Write-Host "- 公式ガイド: 更新版へ置換"
-Write-Host "- エリアメモ: 保持"
-Write-Host "- 新版PoENavi: 自動起動"
-Write-Host "テスト用データ: $testRoot"
-
+Write-Host "- Official guide: replaced"
+Write-Host "- Area notes: preserved"
+Write-Host "- Updated PoENavi: launched"
+Write-Host "Test data: $testRoot"
