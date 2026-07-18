@@ -30,8 +30,9 @@ def test_area_note_migration_notice_is_shown_and_saved_once(qapp):
 
     message.setWindowTitle.assert_called_once_with("📝 ユーザーメモ機能について")
     shown_text = message.setText.call_args.args[0]
-    assert "自動アップデート時に公式ガイドを" in shown_text
-    assert "各エリアのガイドは\n編集できない仕様に変更しました" in shown_text
+    assert "各エリアのガイドデータは\n編集できない仕様に変更しました" in shown_text
+    assert "PoENaviの自動アップデート機能を正しく動作させるため" in shown_text
+    assert "「エリアメモ」機能を実装しました。\n\n以前のガイド" in shown_text
     assert "旧PoENaviフォルダのJSONファイル" in shown_text
     assert "次回以降のアップデートでユーザーメモが失われることはありません" in shown_text
     message.exec.assert_called_once_with()
