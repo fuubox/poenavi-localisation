@@ -4153,6 +4153,13 @@ class MainWindow(QMainWindow):
         self.vendor_search_btn.setToolTip("店売り・スタッシュ検索プリセット")
         self.vendor_search_btn.clicked.connect(self.open_vendor_search_presets)
         button_layout.addWidget(self.vendor_search_btn)
+
+        self.poetore_btn = QPushButton("💰")
+        self.poetore_btn.setStyleSheet(Styles.BUTTON)
+        self.poetore_btn.setFixedSize(35, 35)
+        self.poetore_btn.setToolTip("ぽえとれ（アイテム解析・ローカル試作）")
+        self.poetore_btn.clicked.connect(self.open_poetore)
+        button_layout.addWidget(self.poetore_btn)
         
         self.settings_btn = QPushButton("⚙")
         self.settings_btn.setStyleSheet(Styles.BUTTON)
@@ -6605,6 +6612,12 @@ class MainWindow(QMainWindow):
             self.config.get("text_opacity", 100)
         )
         self._memo_dialog.show()
+
+    def open_poetore(self):
+        """ぽえとれを必要になった時だけ読み込んで別ウィンドウで開く。"""
+        from src.poetore.ui import show_poetore_window
+
+        show_poetore_window(self)
     
     def open_settings(self):
         dialog = SettingsDialog(self, self.config)
