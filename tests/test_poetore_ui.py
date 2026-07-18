@@ -20,6 +20,8 @@ def test_poetore_window_always_accepts_mouse_input(qapp):
         assert window.isEnabled()
         assert not window.testAttribute(Qt.WA_TransparentForMouseEvents)
         assert not bool(window.windowFlags() & Qt.WindowTransparentForInput)
+        assert window.trade_status_combo.currentData() == "instant"
+        assert window.trade_status_combo.count() == 3
     finally:
         window.close()
 

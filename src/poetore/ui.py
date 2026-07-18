@@ -5,7 +5,7 @@ import threading
 from PySide6.QtCore import QObject, Qt, QTimer, Signal
 from PySide6.QtWidgets import (
     QAbstractItemView,
-    QApplication, QHBoxLayout, QLabel, QLineEdit, QMessageBox, QPushButton, QSplitter,
+    QApplication, QComboBox, QHBoxLayout, QLabel, QLineEdit, QMessageBox, QPushButton, QSplitter,
     QTreeWidget, QTreeWidgetItem, QVBoxLayout, QWidget, QPlainTextEdit, QHeaderView,
 )
 
@@ -47,6 +47,12 @@ class PoetoreWindow(QWidget):
         self.price_button = QPushButton("価格を検索")
         self.price_button.clicked.connect(self.search_current_item)
         buttons.addWidget(self.price_button)
+        buttons.addWidget(QLabel("取引方式:"))
+        self.trade_status_combo = QComboBox()
+        self.trade_status_combo.addItem("インスタントバイアウトのみ", "instant")
+        self.trade_status_combo.addItem("インスタント＋対面", "available")
+        self.trade_status_combo.addItem("対面トレードのみ", "online")
+        buttons.addWidget(self.trade_status_combo)
         buttons.addStretch()
         layout.addLayout(buttons)
 
@@ -79,7 +85,7 @@ class PoetoreWindow(QWidget):
         mod_header.setSectionResizeMode(2, QHeaderView.Stretch)
         mod_header.setSectionResizeMode(3, QHeaderView.ResizeToContents)
         layout.addWidget(self.mod_filter_tree)
-        self.price_status = QLabel("価格検索はPoE公式Trade APIのオンライン出品を使います。")
+        self.price_status = QLabel("価格検索はPoE公式Trade APIを使います。初期設定はインスタントバイアウトのみです。")
         self.price_status.setWordWrap(True)
         layout.addWidget(self.price_status)
         self.price_list = QTreeWidget()
@@ -174,7 +180,9 @@ class PoetoreWindow(QWidget):
             return
         self.price_button.setEnabled(False)
         self.price_list.clear()
-        self.price_status.setText("現在のPCリーグでオンライン出品を検索中…")
+        trade_status = str(self.trade_status_combo.currentData())
+        trade_status_label = self.trade_status_combo.currentText()
+        self.price_status.setText(f"現在のPCリーグで「{trade_status_label}」を検索中…")
         filters = self._selected_stat_filters()
         needs_initial_filters = self.mod_filter_tree.topLevelItemCount() == 0
 
@@ -182,7 +190,10 @@ class PoetoreWindow(QWidget):
             try:
                 initial_filters = resolve_trade_stat_filters(item) if needs_initial_filters else ()
                 effective_filters = initial_filters if needs_initial_filters else filters
-                result = search_prices(item, self._trade_base_type, stat_filters=effective_filters)
+                result = search_prices(
+                    item, self._trade_base_type, stat_filters=effective_filters,
+                    trade_status=trade_status,
+                )
             except TradeApiError as exc:
                 self._trade_signals.failed.emit(str(exc))
             else:

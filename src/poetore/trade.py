@@ -14,6 +14,11 @@ API_ROOT = "https://www.pathofexile.com/api/trade"
 JP_API_ROOT = "https://jp.pathofexile.com/api/trade"
 USER_AGENT = "PoENavi/poetore-local-spike (github.com/buri34/poenavi)"
 DEFAULT_SEARCH_RANGE = 0.10
+TRADE_STATUS_OPTIONS = {
+    "instant": "securable",
+    "available": "available",
+    "online": "online",
+}
 
 _PROPERTY_FILTERS = {
     "property.total_dps": ("weapon_filters", "dps"),
@@ -291,10 +296,13 @@ def resolve_trade_stat_filters(item: ParsedItem) -> tuple[TradeStatFilter, ...]:
 def build_search_query(
     item: ParsedItem, trade_base_type: str | None = None,
     stat_filters: tuple[TradeStatFilter, ...] = (),
+    trade_status: str = "instant",
 ) -> dict:
+    if trade_status not in TRADE_STATUS_OPTIONS:
+        raise ValueError(f"未対応の取引方式です: {trade_status}")
     base_type = (trade_base_type or item.base_type).strip()
     query: dict = {
-        "status": {"option": "online"},
+        "status": {"option": TRADE_STATUS_OPTIONS[trade_status]},
         "type": base_type,
         "stats": [{"type": "and", "filters": []}],
         "filters": {"trade_filters": {"filters": {"price": {"option": "chaos"}}}},
@@ -322,11 +330,12 @@ def build_search_query(
 def search_prices(
     item: ParsedItem, trade_base_type: str | None = None, league: str | None = None,
     stat_filters: tuple[TradeStatFilter, ...] = (),
+    trade_status: str = "instant",
 ) -> PriceResult:
     league = league or active_pc_league()
     search, headers = _request_json(
         f"{API_ROOT}/search/{quote(league, safe='')}",
-        build_search_query(item, trade_base_type, stat_filters),
+        build_search_query(item, trade_base_type, stat_filters, trade_status),
     )
     query_id = str(search.get("id", ""))
     ids = list(search.get("result", ()))

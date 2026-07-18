@@ -29,6 +29,7 @@ def test_weapon_search_uses_english_base_rarity_and_comparable_pdps():
     assert query["type"] == "Reaver Sword"
     assert query["filters"]["type_filters"]["filters"]["rarity"]["option"] == "rare"
     assert query["filters"]["weapon_filters"]["filters"]["pdps"]["min"] == 226.3
+    assert query["status"]["option"] == "securable"
     assert round(physical_dps(item), 2) == 251.43
 
 
@@ -107,6 +108,23 @@ def test_enabled_stat_filter_is_added_with_editable_minimum():
     assert query["stats"][0]["filters"] == [
         {"id": "explicit.stat_1", "value": {"min": 74}},
     ]
+
+
+def test_trade_status_modes_map_to_official_api_options():
+    item = parse_item_text(ITEM)
+    assert build_search_query(item, trade_status="instant")["query"]["status"] == {"option": "securable"}
+    assert build_search_query(item, trade_status="available")["query"]["status"] == {"option": "available"}
+    assert build_search_query(item, trade_status="online")["query"]["status"] == {"option": "online"}
+
+
+def test_unknown_trade_status_is_rejected():
+    item = parse_item_text(ITEM)
+    try:
+        build_search_query(item, trade_status="offline")
+    except ValueError as exc:
+        assert "未対応の取引方式" in str(exc)
+    else:
+        raise AssertionError("unknown trade status was accepted")
 
 
 def test_japanese_modifier_resolves_to_official_trade_stat_id():
