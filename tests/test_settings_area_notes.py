@@ -1,9 +1,10 @@
 from unittest.mock import MagicMock
 
 import pytest
+from PySide6.QtCore import qInstallMessageHandler
 from PySide6.QtWidgets import QApplication, QDialog
 
-from src.ui.settings_dialog import SettingsDialog
+from src.ui.settings_dialog import AreaNoteDialog, SettingsDialog
 from src.utils.poe_version_data import POE1, POE2
 
 
@@ -51,3 +52,19 @@ def test_settings_area_note_editor_does_not_save_when_cancelled(monkeypatch, qap
     dialog._open_area_note_editor("act1_area1", "黄昏の海岸")
 
     save.assert_not_called()
+
+
+def test_area_note_dialog_stylesheets_parse_without_qt_warnings(qapp):
+    messages = []
+    previous_handler = qInstallMessageHandler(
+        lambda message_type, context, message: messages.append(message)
+    )
+    try:
+        dialog = AreaNoteDialog(None, "黄昏の海岸", "テストメモ")
+        dialog.show()
+        qapp.processEvents()
+        dialog.close()
+    finally:
+        qInstallMessageHandler(previous_handler)
+
+    assert not [message for message in messages if "Could not parse stylesheet" in message]

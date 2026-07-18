@@ -191,7 +191,7 @@ class AreaNoteDialog(QDialog):
             button.setToolTip(color_name)
             button.setStyleSheet(
                 f"QPushButton {{ background: {color_code}; border: 1px solid #777; "
-                "border-radius: 3px; }} QPushButton:hover { border: 2px solid white; }"
+                "border-radius: 3px; } QPushButton:hover { border: 2px solid white; }"
             )
             button.clicked.connect(lambda checked=False, color=color_code: self._set_color(color))
             toolbar.addWidget(button)
@@ -205,7 +205,7 @@ class AreaNoteDialog(QDialog):
         self.text_edit = RichTextEdit()
         self.text_edit.setStyleSheet(
             f"QTextEdit {{ background: #1a1a1a; color: {Styles.TEXT_COLOR}; "
-            "border: 1px solid #4b6b3b; padding: 7px; font-size: 13px; }}"
+            "border: 1px solid #4b6b3b; padding: 7px; font-size: 13px; }"
         )
         self.text_edit.set_from_html(content)
         layout.addWidget(self.text_edit)
