@@ -41,13 +41,35 @@ class MiniNaviLockButtonWindow(QWidget):
     def __init__(self, overlay):
         super().__init__(None)
         self.overlay = overlay
-        self.setWindowFlags(_with_optional_mini_always_on_top(Qt.Tool | Qt.FramelessWindowHint, overlay.parent()))
+        self.setWindowFlags(_with_optional_mini_always_on_top(Qt.Tool | Qt.FramelessWindowHint, overlay.main_window))
         self.setAttribute(Qt.WA_TranslucentBackground, True)
         self.setAttribute(Qt.WA_ShowWithoutActivating, True)
-        self.setFixedSize(30, 28)
+        self.setFixedHeight(28)
 
-        layout = QVBoxLayout(self)
+        layout = QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(4)
+        self.restore_button = QPushButton("本体")
+        self.restore_button.setFixedSize(44, 28)
+        self.restore_button.setCursor(QCursor(Qt.PointingHandCursor))
+        self.restore_button.setToolTip("ぽえなび本体の表示／非表示を切り替えます")
+        self.restore_button.setStyleSheet("""
+            QPushButton {
+                background: rgba(10, 10, 10, 220);
+                color: #ffffff;
+                border: 1px solid rgba(176, 255, 123, 140);
+                border-radius: 6px;
+                font-size: 12px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background: rgba(73, 110, 50, 230);
+                border-color: rgba(176, 255, 123, 220);
+            }
+        """)
+        self.restore_button.clicked.connect(self.overlay.toggle_main_window)
+        layout.addWidget(self.restore_button)
+
         self.button = QPushButton("🔒")
         self.button.setFixedSize(30, 28)
         self.button.setCursor(QCursor(Qt.PointingHandCursor))
@@ -69,9 +91,17 @@ class MiniNaviLockButtonWindow(QWidget):
 
     def sync_from_overlay(self):
         cfg = self.overlay.config()
-        if not self.overlay.isVisible() or not cfg.get("enabled", False) or not cfg.get("show_lock_button", True):
+        main_hidden = self.overlay.is_main_window_hidden()
+        show_lock_button = bool(cfg.get("show_lock_button", True))
+        if not self.overlay.isVisible() or not cfg.get("enabled", False):
             self.hide()
             return
+        self.restore_button.setVisible(True)
+        self.button.setVisible(show_lock_button)
+        width = 44 + (30 if show_lock_button else 0)
+        if show_lock_button:
+            width += 4
+        self.setFixedWidth(width)
         self.button.setText("🔒" if cfg.get("locked", True) else "🔓")
         self.move(self.overlay.x() + self.overlay.width() - self.width() - 4, self.overlay.y() + 4)
         self.show()
@@ -131,8 +161,12 @@ class MiniNaviOverlay(QWidget):
     }
 
     def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setWindowFlags(_with_optional_mini_always_on_top(Qt.Tool | Qt.FramelessWindowHint, parent))
+        # Windowsでは親を持つツールウィンドウは、親の最小化・非表示に追従して
+        # 一緒に隠れる。設定や終了処理の所有者は参照として保持しつつ、Qt上は
+        # 独立したトップレベルウィンドウにする。
+        super().__init__(None)
+        self.main_window = parent
+        self.setWindowFlags(_with_optional_mini_always_on_top(Qt.Tool | Qt.FramelessWindowHint, self.main_window))
         self.setAttribute(Qt.WA_TranslucentBackground, True)
         self.setAttribute(Qt.WA_ShowWithoutActivating, True)
 
@@ -188,7 +222,7 @@ class MiniNaviOverlay(QWidget):
         self.area_note_badge.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         self.area_note_badge.setStyleSheet(
             "color: #f0c674; font-size: 12px; font-weight: bold; "
-            "padding-right: 24px; background: transparent;"
+            "padding-right: 54px; background: transparent;"
         )
         self.area_note_badge.installEventFilter(self)
         self.area_note_badge.hide()
@@ -217,7 +251,7 @@ class MiniNaviOverlay(QWidget):
         self.hide()
 
     def config(self) -> dict:
-        parent_config = getattr(self.parent(), "config", {}) if self.parent() else {}
+        parent_config = getattr(self.main_window, "config", {}) if self.main_window else {}
         overlay_config = parent_config.setdefault("mini_guide_overlay", {}) if isinstance(parent_config, dict) else {}
         merged = dict(self.DEFAULT_CONFIG)
         if isinstance(overlay_config, dict):
@@ -351,14 +385,26 @@ class MiniNaviOverlay(QWidget):
         self._show_strong_opacity(restart_fade=bool(cfg.get("locked", True)))
 
     def _mutable_config(self) -> dict:
-        parent_config = getattr(self.parent(), "config", {}) if self.parent() else {}
+        parent_config = getattr(self.main_window, "config", {}) if self.main_window else {}
         return parent_config.setdefault("mini_guide_overlay", {})
 
     def _save_parent_config(self):
-        if self.parent() and hasattr(self.parent(), "config"):
-            ConfigManager.save_config(self.parent().config)
-            if hasattr(self.parent(), "_refresh_mini_navi_toggle"):
-                self.parent()._refresh_mini_navi_toggle()
+        if self.main_window and hasattr(self.main_window, "config"):
+            ConfigManager.save_config(self.main_window.config)
+            if hasattr(self.main_window, "_refresh_mini_navi_toggle"):
+                self.main_window._refresh_mini_navi_toggle()
+
+    def is_main_window_hidden(self) -> bool:
+        return bool(self.main_window and getattr(self.main_window, "_hidden_for_mini_navi", False))
+
+    def toggle_main_window(self):
+        if not self.main_window:
+            return
+        if self.is_main_window_hidden():
+            if hasattr(self.main_window, "restore_from_mini_navi"):
+                self.main_window.restore_from_mini_navi()
+        elif hasattr(self.main_window, "hide_for_mini_navi"):
+            self.main_window.hide_for_mini_navi()
 
     def _remember_current_geometry_to_config(self):
         cfg = self._mutable_config()
@@ -492,8 +538,8 @@ class MiniNaviOverlay(QWidget):
     def _apply_window_flags(self):
         was_visible = self.isVisible()
         lock_was_visible = self.lock_button_window.isVisible()
-        self.setWindowFlags(_with_optional_mini_always_on_top(Qt.Tool | Qt.FramelessWindowHint, self.parent()))
-        self.lock_button_window.setWindowFlags(_with_optional_mini_always_on_top(Qt.Tool | Qt.FramelessWindowHint, self.parent()))
+        self.setWindowFlags(_with_optional_mini_always_on_top(Qt.Tool | Qt.FramelessWindowHint, self.main_window))
+        self.lock_button_window.setWindowFlags(_with_optional_mini_always_on_top(Qt.Tool | Qt.FramelessWindowHint, self.main_window))
         if was_visible:
             self.show()
             self.raise_()
@@ -3911,8 +3957,8 @@ class MainWindow(QMainWindow):
         minimize_btn = QPushButton("─")
         minimize_btn.setFixedSize(30, 22)
         minimize_btn.setStyleSheet(btn_style)
-        minimize_btn.setToolTip("最小化")
-        minimize_btn.clicked.connect(self.showMinimized)
+        minimize_btn.setToolTip("最小化（みになび表示中は本体だけ隠します）")
+        minimize_btn.clicked.connect(self.minimize_main_window)
         title_bar.addWidget(minimize_btn)
         
         close_btn = QPushButton("✕")
@@ -6679,6 +6725,34 @@ class MainWindow(QMainWindow):
     def _main_window_flags(self):
         return _with_optional_always_on_top(Qt.FramelessWindowHint, self)
 
+    def minimize_main_window(self):
+        """みになび表示中は本体だけ隠し、それ以外は通常どおり最小化する。"""
+        overlay = getattr(self, "mini_navi_overlay", None)
+        if overlay is not None and self._is_mini_navi_available() and overlay.isVisible():
+            self.hide_for_mini_navi()
+            return
+        self.showMinimized()
+
+    def hide_for_mini_navi(self):
+        """ぽえなび本体だけを隠し、みになびの表示を維持する。"""
+        self._hidden_for_mini_navi = True
+        self.hide()
+        overlay = getattr(self, "mini_navi_overlay", None)
+        if overlay is not None:
+            overlay.show()
+            overlay.raise_()
+            overlay._sync_lock_button()
+
+    def restore_from_mini_navi(self):
+        """みになびだけの表示状態から、ぽえなび本体を復帰する。"""
+        self._hidden_for_mini_navi = False
+        self.showNormal()
+        self.raise_()
+        self.activateWindow()
+        overlay = getattr(self, "mini_navi_overlay", None)
+        if overlay is not None:
+            overlay._sync_lock_button()
+
     def _apply_window_flags(self):
         was_visible = self.isVisible()
         self.setWindowFlags(self._main_window_flags())
@@ -6780,6 +6854,11 @@ class MainWindow(QMainWindow):
         }
         ConfigManager.save_config(config)
         self.config = config
+
+        # みになびは本体と独立したトップレベルウィンドウなので、アプリ終了時は
+        # 明示的に一緒に閉じる。
+        if hasattr(self, "mini_navi_overlay"):
+            self.mini_navi_overlay.close()
         
         if self.keyboard_listener:
             self.keyboard_listener.stop()

@@ -36,6 +36,7 @@ class MiniNaviAreaNoteBadgeTest(unittest.TestCase):
 
         self.assertTrue(overlay.area_note_badge.isVisible())
         self.assertEqual(overlay.area_note_badge.text(), "エリアメモあり")
+        self.assertIn("padding-right: 54px", overlay.area_note_badge.styleSheet())
         overlay.close()
 
     def test_badge_is_hidden_when_current_area_has_no_note(self):
