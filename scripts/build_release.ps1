@@ -30,7 +30,7 @@ New-Item -ItemType Directory -Force build\generated | Out-Null
 $iconCode = @"
 from pathlib import Path
 from PIL import Image, ImageOps
-source = Image.open(Path('assets/icons/green.png')).convert('RGBA')
+source = Image.open(Path('assets/app/updater.png')).convert('RGBA')
 icon = ImageOps.fit(source, (256, 256), method=Image.Resampling.LANCZOS)
 icon.save(Path('build/generated/updater.ico'), sizes=[(16, 16), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)])
 "@
