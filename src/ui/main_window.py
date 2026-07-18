@@ -144,6 +144,7 @@ class MiniNaviOverlay(QWidget):
         self._current_content = None
         self._current_exp_guide = None
         self._current_zone_id = None
+        self._current_has_area_note = False
         self._muted_content = False
         self._lock_button_hidden_for_drag = False
         self._fade_timer = QTimer(self)
@@ -182,6 +183,16 @@ class MiniNaviOverlay(QWidget):
         right_column = QVBoxLayout()
         right_column.setContentsMargins(0, 0, 0, 0)
         right_column.setSpacing(5)
+
+        self.area_note_badge = QLabel("ユーザーメモあり")
+        self.area_note_badge.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        self.area_note_badge.setStyleSheet(
+            "color: #f0c674; font-size: 12px; font-weight: bold; "
+            "padding-right: 24px; background: transparent;"
+        )
+        self.area_note_badge.installEventFilter(self)
+        self.area_note_badge.hide()
+        right_column.addWidget(self.area_note_badge, stretch=0, alignment=Qt.AlignRight)
 
         self.text_label = QLabel("")
         self.text_label.setTextFormat(Qt.RichText)
@@ -245,16 +256,24 @@ class MiniNaviOverlay(QWidget):
         """みになび本文・矢印・経験値表示の文字透過率を適用。"""
         from PySide6.QtWidgets import QGraphicsOpacityEffect
         opacity = max(0.0, min(int(opacity_pct) / 100.0, 1.0))
-        for widget in (self.arrow_label, self.exp_label, self.text_label):
+        for widget in (self.arrow_label, self.exp_label, self.text_label, self.area_note_badge):
             effect = QGraphicsOpacityEffect(widget)
             effect.setOpacity(opacity)
             widget.setGraphicsEffect(effect)
 
-    def update_content(self, mini_navi: dict | None, exp_guide: dict | None = None, muted: bool = False, zone_id: str | None = None):
+    def update_content(
+        self,
+        mini_navi: dict | None,
+        exp_guide: dict | None = None,
+        muted: bool = False,
+        zone_id: str | None = None,
+        has_area_note: bool = False,
+    ):
         self._current_content = mini_navi
         self._current_exp_guide = exp_guide
         self._muted_content = muted
         self._current_zone_id = zone_id
+        self._current_has_area_note = bool(has_area_note)
         cfg = self.config()
         if not cfg.get("enabled", False):
             self.hide()
@@ -281,6 +300,7 @@ class MiniNaviOverlay(QWidget):
         self.exp_label.setVisible(bool(exp_guide))
         self.text_label.setAlignment(Qt.AlignCenter if muted else Qt.AlignVCenter | Qt.AlignLeft)
         self.text_label.setText("<br>".join(self._render_line(line) for line in lines))
+        self.area_note_badge.setVisible(bool(has_area_note) and not muted)
         self.apply_settings(refresh_window_flags=False)
         self._fit_height_to_content()
         self.show()
@@ -304,6 +324,7 @@ class MiniNaviOverlay(QWidget):
                 self._current_exp_guide,
                 muted=self._muted_content,
                 zone_id=getattr(self, "_current_zone_id", None),
+                has_area_note=getattr(self, "_current_has_area_note", False),
             )
             return
         self.show_waiting_for_area()
@@ -316,6 +337,7 @@ class MiniNaviOverlay(QWidget):
             self._current_content,
             self._current_exp_guide,
             zone_id=getattr(self, "_current_zone_id", None),
+            has_area_note=getattr(self, "_current_has_area_note", False),
         )
 
     def toggle_locked(self):
@@ -6173,6 +6195,7 @@ class MainWindow(QMainWindow):
                         get_mini_navi_content(guide, max_lines=max_lines),
                         self._mini_navi_exp_guide(exp_level, zone_id=zone_id),
                         zone_id=zone_id,
+                        has_area_note=bool(self._current_area_note.strip()),
                     )
                 else:
                     self.mini_navi_overlay.hide()
