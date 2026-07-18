@@ -13,12 +13,13 @@ GITHUB_HOSTS = {
     "release-assets.githubusercontent.com",
 }
 
-# 現行の配布物は展開後約372MB。将来の増加に余裕を持たせつつ、
+# v2.4.0 配布物（529エントリー、展開後約219MiB、最大ファイル約19.7MiB、
+# 最大圧縮率約4.8倍）を基準に、将来の増加へ十分な余裕を持たせつつ、
 # 更新ZIPによるディスク枯渇を防ぐための上限を設ける。
-MAX_ARCHIVE_ENTRIES = 20_000
-MAX_TOTAL_UNCOMPRESSED_SIZE = 1024 * 1024 * 1024
-MAX_SINGLE_FILE_SIZE = 512 * 1024 * 1024
-MAX_COMPRESSION_RATIO = 200
+MAX_ARCHIVE_ENTRIES = 5_000
+MAX_TOTAL_UNCOMPRESSED_SIZE = 512 * 1024 * 1024
+MAX_SINGLE_FILE_SIZE = 128 * 1024 * 1024
+MAX_COMPRESSION_RATIO = 100
 MIN_RATIO_CHECK_SIZE = 1024 * 1024
 
 
