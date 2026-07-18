@@ -8,6 +8,7 @@ from PySide6.QtWidgets import (
 )
 
 from .parser import ItemParseError, parse_item_text
+from .clipboard import read_item_clipboard
 
 
 class PoetoreWindow(QWidget):
@@ -15,7 +16,7 @@ class PoetoreWindow(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent, Qt.Window)
-        self.setWindowTitle("ぽえとれ（ローカル試作・日本語名対応版）")
+        self.setWindowTitle("ぽえとれ（ローカル試作・Unicode取得版）")
         self.resize(860, 620)
         layout = QVBoxLayout(self)
         note = QLabel("PoEで詳細コピーしたアイテム文章を貼り付けて解析します。価格検索APIは未接続です。")
@@ -50,7 +51,7 @@ class PoetoreWindow(QWidget):
         layout.addWidget(splitter, stretch=1)
 
     def paste_from_clipboard(self):
-        self.input_edit.setPlainText(QApplication.clipboard().text())
+        self.input_edit.setPlainText(read_item_clipboard(QApplication.clipboard()))
         self.parse_current_text()
 
     def parse_current_text(self):
