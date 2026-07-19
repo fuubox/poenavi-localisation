@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 
 from .models import ItemModifier, ParsedItem
+from .metadata import default_metadata_index
 
 
 class ItemParseError(ValueError):
@@ -111,6 +112,13 @@ def _numbers(text: str) -> tuple[float, ...]:
     for match in _NUMBER.findall(text.replace(",", "")):
         values.append(float(match))
     return tuple(values)
+
+
+def _roll_bounds(text: str) -> tuple[float | None, float | None]:
+    matches = re.findall(r"\(\s*(-?\d+(?:\.\d+)?)\s*-\s*(-?\d+(?:\.\d+)?)\s*\)", text)
+    if not matches:
+        return None, None
+    return min(float(low) for low, _ in matches), max(float(high) for _, high in matches)
 
 
 def _modifier_header_kind(line: str) -> str | None:
@@ -229,6 +237,8 @@ def parse_item_text(text: str) -> ParsedItem:
             else:
                 kind = current_header_kind or "explicit"
             from_header = kind == current_header_kind
+            metadata, confidence = default_metadata_index().match(line, kind)
+            roll_min, roll_max = _roll_bounds(line)
             modifiers.append(ItemModifier(
                 text=line, values=_numbers(line), kind=kind,
                 tier=current_header_tier if from_header else None,
@@ -236,6 +246,13 @@ def parse_item_text(text: str) -> ParsedItem:
                     kind if kind in {"prefix", "suffix"} else None
                 ),
                 group=current_modifier_group if from_header else None,
+                ref=metadata.ref if metadata else None,
+                stat_id=metadata.stat_id if metadata else None,
+                confidence=confidence,
+                roll_min=roll_min,
+                roll_max=roll_max,
+                better=metadata.better if metadata else None,
+                inverted=metadata.inverted if metadata else False,
             ))
 
     return ParsedItem(

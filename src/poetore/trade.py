@@ -8,6 +8,7 @@ from urllib.parse import quote
 from urllib.request import Request, urlopen
 
 from .models import ParsedItem
+from .metadata import default_metadata_index
 
 
 API_ROOT = "https://www.pathofexile.com/api/trade"
@@ -106,6 +107,10 @@ class TradeStatFilter:
     min_value: float | None
     kind: str
     enabled: bool = False
+    max_value: float | None = None
+    ref: str | None = None
+    confidence: float = 0.0
+    inverted: bool = False
 
 
 @dataclass(frozen=True)
@@ -550,9 +555,22 @@ def resolve_trade_stat_filters(
         value = _value_for_template(modifier.text, str(entry.get("text", "")))
         if value is None:
             value = modifier.values[0] if modifier.values else None
-        if unique_item and roll_bounds is not None:
+        maximum = None
+        if modifier.stat_id == str(entry["id"]):
+            metadata, _ = default_metadata_index().match(modifier.text, modifier.kind)
+            if metadata:
+                value, maximum = metadata.search_bounds(
+                    value,
+                    modifier.roll_min if unique_item else None,
+                    modifier.roll_max if unique_item else None,
+                    DEFAULT_SEARCH_RANGE,
+                )
+        if unique_item and roll_bounds is not None and modifier.stat_id != str(entry["id"]):
             value = _unique_minimum(value, roll_bounds)
-        resolved.append(TradeStatFilter(str(entry["id"]), modifier.text, value, modifier.kind, False))
+        resolved.append(TradeStatFilter(
+            str(entry["id"]), modifier.text, value, modifier.kind, False,
+            maximum, modifier.ref, modifier.confidence, modifier.inverted,
+        ))
     combined: dict[str, TradeStatFilter] = {}
     counts: dict[str, int] = {}
     for stat_filter in resolved:
@@ -567,6 +585,8 @@ def resolve_trade_stat_filters(
             total = previous.min_value + stat_filter.min_value
         combined[stat_filter.stat_id] = TradeStatFilter(
             stat_filter.stat_id, previous.text, total, previous.kind, False,
+            stat_filter.max_value, stat_filter.ref, min(previous.confidence, stat_filter.confidence),
+            stat_filter.inverted,
         )
     enable_unique_rolls = unique_item and len(combined) <= 3
     individual = tuple(
@@ -574,6 +594,7 @@ def resolve_trade_stat_filters(
             row.stat_id,
             f"{row.text} ({counts[row.stat_id]}行合計)" if counts[row.stat_id] > 1 else row.text,
             row.min_value, row.kind, enable_unique_rolls or row.enabled,
+            row.max_value, row.ref, row.confidence, row.inverted,
         )
         for row in combined.values()
     )
@@ -660,8 +681,16 @@ def build_search_query(
             query["filters"].setdefault(group, {"filters": {}})["filters"][name] = value
             continue
         value = {}
-        if stat_filter.min_value is not None:
-            value["min"] = stat_filter.min_value
+        minimum, maximum = stat_filter.min_value, stat_filter.max_value
+        if stat_filter.inverted:
+            minimum, maximum = (
+                -maximum if maximum is not None else None,
+                -minimum if minimum is not None else None,
+            )
+        if minimum is not None:
+            value["min"] = minimum
+        if maximum is not None:
+            value["max"] = maximum
         query["stats"][0]["filters"].append({"id": stat_filter.stat_id, "value": value})
     return {"query": query, "sort": {"price": "asc"}}
 

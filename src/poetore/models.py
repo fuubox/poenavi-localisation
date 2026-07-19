@@ -11,6 +11,13 @@ class ItemModifier:
     tier: int | None = None
     affix: str | None = None
     group: int | None = None
+    ref: str | None = None
+    stat_id: str | None = None
+    confidence: float = 0.0
+    roll_min: float | None = None
+    roll_max: float | None = None
+    better: int | None = None
+    inverted: bool = False
 
 
 @dataclass(frozen=True)

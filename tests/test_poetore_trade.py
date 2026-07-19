@@ -80,6 +80,21 @@ def test_all_supported_trade_currency_options_map_to_api_values():
         assert query["filters"]["trade_filters"]["filters"]["price"]["option"] == api_value
 
 
+def test_stat_filter_supports_maximum_exact_and_trade_inversion():
+    item = parse_item_text(ITEM)
+    filters = (
+        TradeStatFilter("explicit.low", "低いほど良い", None, "suffix", True, 12),
+        TradeStatFilter("explicit.exact", "完全一致", 3, "suffix", True, 3),
+        TradeStatFilter("explicit.inverted", "API符号反転", 10, "suffix", True, 20, None, 1.0, True),
+    )
+    query = build_search_query(item, "Reaver Sword", filters)["query"]
+    assert query["stats"][0]["filters"] == [
+        {"id": "explicit.low", "value": {"max": 12}},
+        {"id": "explicit.exact", "value": {"min": 3, "max": 3}},
+        {"id": "explicit.inverted", "value": {"min": -20, "max": -10}},
+    ]
+
+
 def test_high_item_level_unfinished_rare_has_finished_and_base_presets():
     item = parse_item_text(ITEM.replace("Item Level: 67", "Item Level: 85"))
     assert available_trade_presets(item) == (PRESET_FINISHED, PRESET_BASE)

@@ -102,7 +102,7 @@ class PoetoreWindow(QWidget):
         mod_label = QLabel("検索に使うMod（チェックした条件だけ再検索に使用）")
         layout.addWidget(mod_label)
         self.mod_filter_tree = QTreeWidget()
-        self.mod_filter_tree.setHeaderLabels(["使用", "種別", "Mod", "最小値"])
+        self.mod_filter_tree.setHeaderLabels(["使用", "種別", "Mod", "最小値", "最大値"])
         self.mod_filter_tree.setRootIsDecorated(False)
         self.mod_filter_tree.setAlternatingRowColors(True)
         self.mod_filter_tree.setMinimumHeight(145)
@@ -327,14 +327,22 @@ class PoetoreWindow(QWidget):
         for index in range(self.mod_filter_tree.topLevelItemCount()):
             row = self.mod_filter_tree.topLevelItem(index)
             editor = self.mod_filter_tree.itemWidget(row, 3)
+            max_editor = self.mod_filter_tree.itemWidget(row, 4)
             value_text = editor.text().strip() if isinstance(editor, QLineEdit) else row.text(3).strip()
+            max_text = max_editor.text().strip() if isinstance(max_editor, QLineEdit) else row.text(4).strip()
             try:
                 value = float(value_text) if value_text else None
             except ValueError:
                 value = None
+            try:
+                maximum = float(max_text) if max_text else None
+            except ValueError:
+                maximum = None
             filters.append(TradeStatFilter(
                 row.data(0, Qt.UserRole), row.text(2), value, row.text(1),
                 row.checkState(0) == Qt.Checked,
+                maximum, row.data(0, Qt.UserRole + 1), row.data(0, Qt.UserRole + 2) or 0.0,
+                bool(row.data(0, Qt.UserRole + 3)),
             ))
         return tuple(filters)
 
@@ -342,8 +350,12 @@ class PoetoreWindow(QWidget):
         self.mod_filter_tree.clear()
         for stat_filter in filters:
             value = "" if stat_filter.min_value is None else f"{stat_filter.min_value:g}"
-            row = QTreeWidgetItem(["", stat_filter.kind, stat_filter.text, ""])
+            maximum = "" if stat_filter.max_value is None else f"{stat_filter.max_value:g}"
+            row = QTreeWidgetItem(["", stat_filter.kind, stat_filter.text, "", ""])
             row.setData(0, Qt.UserRole, stat_filter.stat_id)
+            row.setData(0, Qt.UserRole + 1, stat_filter.ref)
+            row.setData(0, Qt.UserRole + 2, stat_filter.confidence)
+            row.setData(0, Qt.UserRole + 3, stat_filter.inverted)
             row.setCheckState(0, Qt.Checked if stat_filter.enabled else Qt.Unchecked)
             row.setFlags(row.flags() | Qt.ItemIsUserCheckable)
             self.mod_filter_tree.addTopLevelItem(row)
@@ -351,6 +363,10 @@ class PoetoreWindow(QWidget):
             editor.setPlaceholderText("最小")
             editor.setFixedWidth(80)
             self.mod_filter_tree.setItemWidget(row, 3, editor)
+            max_editor = QLineEdit(maximum)
+            max_editor.setPlaceholderText("最大")
+            max_editor.setFixedWidth(80)
+            self.mod_filter_tree.setItemWidget(row, 4, max_editor)
 
     def _search_completed(self, result: PriceResult, initial_filters):
         if initial_filters:
