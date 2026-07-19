@@ -78,8 +78,60 @@ def test_fractured_item_can_offer_base_preset_below_ilvl_82():
         "74% increased Physical Damage",
         '{ Fractured Prefix Modifier }\n74% increased Physical Damage',
     ))
+    entries = ({
+        "id": "fractured.phys", "text": "#% increased Physical Damage", "type": "fractured",
+    },)
     assert available_trade_presets(item) == (PRESET_FINISHED, PRESET_BASE)
-    assert resolve_trade_stat_filters(item, PRESET_BASE)[0].min_value == 67.0
+    with patch("src.poetore.trade._trade_stat_entries", return_value=entries):
+        filters = resolve_trade_stat_filters(item, PRESET_BASE)
+    assert filters == (
+        TradeStatFilter("property.item_level", "アイテムレベル", 67.0, "base", True),
+        TradeStatFilter("fractured.phys", "74% increased Physical Damage", 74.0, "fractured", True),
+    )
+    query = build_search_query(item, "Reaver Sword", filters, preset=PRESET_BASE)["query"]
+    misc = query["filters"]["misc_filters"]["filters"]
+    assert misc["fractured_item"] == {"option": "true"}
+    assert misc["synthesised_item"] == {"option": "false"}
+    assert query["stats"][0]["filters"] == [
+        {"id": "fractured.phys", "value": {"min": 74.0}},
+    ]
+
+
+def test_influenced_and_synthesised_items_add_strict_base_conditions():
+    item = parse_item_text(ITEM.replace("Item Level: 67", "Item Level: 70").replace(
+        "74% increased Physical Damage",
+        "74% increased Physical Damage\nShaper Item\nElder Item\nSynthesised Item",
+    ))
+    assert available_trade_presets(item) == (PRESET_FINISHED, PRESET_BASE)
+    filters = resolve_trade_stat_filters(item, PRESET_BASE)
+    assert [(row.stat_id, row.enabled) for row in filters] == [
+        ("property.item_level", True),
+        ("pseudo.pseudo_has_shaper_influence", True),
+        ("pseudo.pseudo_has_elder_influence", True),
+    ]
+    query = build_search_query(item, "Reaver Sword", filters, preset=PRESET_BASE)["query"]
+    assert query["filters"]["misc_filters"]["filters"]["synthesised_item"] == {"option": "true"}
+    assert query["filters"]["misc_filters"]["filters"]["fractured_item"] == {"option": "false"}
+    assert query["stats"][0]["filters"] == [
+        {"id": "pseudo.pseudo_has_shaper_influence", "value": {}},
+        {"id": "pseudo.pseudo_has_elder_influence", "value": {}},
+    ]
+
+
+def test_finished_preset_does_not_force_special_base_state():
+    item = parse_item_text(ITEM.replace(
+        "74% increased Physical Damage", "74% increased Physical Damage\nHunter Item",
+    ))
+    with patch("src.poetore.trade._trade_stat_entries", return_value=()):
+        filters = resolve_trade_stat_filters(item, PRESET_FINISHED)
+    query = build_search_query(item, "Reaver Sword", filters, preset=PRESET_FINISHED)["query"]
+    misc = query["filters"].get("misc_filters", {}).get("filters", {})
+    assert "synthesised_item" not in misc
+    assert "fractured_item" not in misc
+    assert not any(
+        row.get("id") == "pseudo.pseudo_has_hunter_influence"
+        for row in query["stats"][0]["filters"]
+    )
 
 
 def test_mixed_weapon_selects_total_dps_and_dominant_component_only():

@@ -22,6 +22,14 @@ TRADE_STATUS_OPTIONS = {
 PRESET_FINISHED = "finished"
 PRESET_BASE = "base"
 TRADE_PRESETS = (PRESET_FINISHED, PRESET_BASE)
+_INFLUENCE_STATS = {
+    "shaper": ("pseudo.pseudo_has_shaper_influence", "Shaper影響"),
+    "elder": ("pseudo.pseudo_has_elder_influence", "Elder影響"),
+    "crusader": ("pseudo.pseudo_has_crusader_influence", "Crusader影響"),
+    "hunter": ("pseudo.pseudo_has_hunter_influence", "Hunter影響"),
+    "redeemer": ("pseudo.pseudo_has_redeemer_influence", "Redeemer影響"),
+    "warlord": ("pseudo.pseudo_has_warlord_influence", "Warlord影響"),
+}
 
 
 def _trade_log(message: str) -> None:
@@ -173,6 +181,8 @@ def available_trade_presets(item: ParsedItem) -> tuple[str, ...]:
     )
     has_crafting_value = (
         any(modifier.kind == "fractured" for modifier in item.modifiers)
+        or "synthesised" in item.flags
+        or any(flag.startswith("influence:") for flag in item.flags)
         or bool(item.item_level is not None and item.item_level >= 82)
     )
     if likely_finished or not has_crafting_value:
@@ -181,12 +191,38 @@ def available_trade_presets(item: ParsedItem) -> tuple[str, ...]:
 
 
 def _base_item_filters(item: ParsedItem) -> tuple[TradeStatFilter, ...]:
-    if item.item_level is None:
-        return ()
-    return (TradeStatFilter(
-        "property.item_level", "アイテムレベル",
-        float(min(item.item_level, 86)), "base", True,
-    ),)
+    filters: list[TradeStatFilter] = []
+    if item.item_level is not None:
+        filters.append(TradeStatFilter(
+            "property.item_level", "アイテムレベル",
+            float(min(item.item_level, 86)), "base", True,
+        ))
+    for flag in item.flags:
+        if not flag.startswith("influence:"):
+            continue
+        influence = flag.split(":", 1)[1]
+        stat = _INFLUENCE_STATS.get(influence)
+        if stat:
+            filters.append(TradeStatFilter(stat[0], stat[1], None, "influence", True))
+    fractured_modifiers = [modifier for modifier in item.modifiers if modifier.kind == "fractured"]
+    entries = _trade_stat_entries() if fractured_modifiers else ()
+    for modifier in fractured_modifiers:
+        source = _normalized_stat_text(modifier.text)
+        candidates = [
+            entry for entry in entries
+            if entry.get("type") == "fractured"
+            and _normalized_stat_text(str(entry.get("text", ""))) == source
+        ]
+        if not candidates:
+            continue
+        entry = candidates[0]
+        value = _value_for_template(modifier.text, str(entry.get("text", "")))
+        if value is None:
+            value = modifier.values[0] if modifier.values else None
+        filters.append(TradeStatFilter(
+            str(entry["id"]), modifier.text, value, "fractured", True,
+        ))
+    return tuple(filters)
 
 
 def _initial_property_filters(item: ParsedItem) -> list[TradeStatFilter]:
@@ -432,6 +468,12 @@ def build_search_query(
         misc = query["filters"].setdefault("misc_filters", {"filters": {}})["filters"]
         misc["corrupted"] = {"option": "false"}
         misc["mirrored"] = {"option": "false"}
+        misc["fractured_item"] = {"option": "true" if any(
+            modifier.kind == "fractured" for modifier in item.modifiers
+        ) else "false"}
+        misc["synthesised_item"] = {
+            "option": "true" if "synthesised" in item.flags else "false"
+        }
     for stat_filter in stat_filters:
         if not stat_filter.enabled:
             continue

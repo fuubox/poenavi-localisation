@@ -33,6 +33,16 @@ _FLAG_LINES = {
     "コラプト状態": "corrupted", "Corrupted": "corrupted",
     "ミラー品": "mirrored", "Mirrored": "mirrored",
     "分割": "split", "Split": "split",
+    "Synthesised Item": "synthesised", "Synthesised": "synthesised",
+    "シンセサイズアイテム": "synthesised", "シンセサイズ済みアイテム": "synthesised",
+    "Shaper Item": "influence:shaper", "シェイパーアイテム": "influence:shaper",
+    "シェイパーのアイテム": "influence:shaper",
+    "Elder Item": "influence:elder", "エルダーアイテム": "influence:elder",
+    "エルダーのアイテム": "influence:elder",
+    "Crusader Item": "influence:crusader", "クルセイダーアイテム": "influence:crusader",
+    "Hunter Item": "influence:hunter", "ハンターアイテム": "influence:hunter",
+    "Redeemer Item": "influence:redeemer", "リディーマーアイテム": "influence:redeemer",
+    "Warlord Item": "influence:warlord", "ウォーロードアイテム": "influence:warlord",
 }
 _CATEGORY_WORDS = (
     (("武器", "Weapon", "弓", "Bow", "ワンド", "Wand", "剣", "Sword", "斧", "Axe",

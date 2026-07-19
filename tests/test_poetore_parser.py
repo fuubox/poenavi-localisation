@@ -183,6 +183,34 @@ Item Level: 70
         )
         self.assertEqual(item.modifiers[1].text, "命中力 +55(47-72)")
 
+    def test_parses_synthesised_and_dual_influence_flags_in_both_languages(self):
+        english = parse_item_text("""Item Class: Body Armours
+Rarity: Rare
+Test Shell
+Vaal Regalia
+--------
+Item Level: 85
+--------
+Shaper Item
+Elder Item
+Synthesised Item
+""")
+        self.assertEqual(
+            english.flags,
+            ("influence:shaper", "influence:elder", "synthesised"),
+        )
+        japanese = parse_item_text("""アイテムクラス: 胴体防具
+レアリティ: レア
+試作品
+ヴァールレガリア
+--------
+アイテムレベル: 85
+--------
+ハンターアイテム
+シンセサイズアイテム
+""")
+        self.assertEqual(japanese.flags, ("influence:hunter", "synthesised"))
+
 
 if __name__ == "__main__":
     unittest.main()
