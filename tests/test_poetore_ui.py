@@ -90,6 +90,36 @@ def test_unidentified_unique_candidates_can_be_selected(qapp):
         window.close()
 
 
+def test_unique_variant_discriminator_can_be_selected(qapp):
+    window = PoetoreWindow()
+    try:
+        window._show_unique_variants((("通常版", None), ("Legacy版", "legacy")))
+        assert window.unique_variant_combo.isVisible() or not window.unique_variant_combo.isHidden()
+        assert window.unique_variant_combo.count() == 2
+        assert window.unique_variant_combo.itemData(1) == "legacy"
+        assert "2種類" in window.price_status.text()
+    finally:
+        window.close()
+
+
+def test_unique_variant_selector_is_cleared_when_item_text_changes(qapp):
+    window = PoetoreWindow()
+    try:
+        window._show_unique_variants((("通常版", None), ("Legacy版", "legacy")))
+        window.input_edit.setPlainText("""Item Class: Belts
+Rarity: Unique
+Another Item
+Heavy Belt
+--------
+Item Level: 70
+""")
+        window.parse_current_text()
+        assert window.unique_variant_combo.isHidden()
+        assert window.unique_variant_combo.count() == 0
+    finally:
+        window.close()
+
+
 def test_trade_preset_selector_only_offers_base_for_crafting_candidate(qapp):
     window = PoetoreWindow()
     try:

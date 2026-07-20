@@ -562,6 +562,23 @@ def unique_candidates(base_type: str) -> tuple[str, ...]:
     return tuple(sorted(names))
 
 
+def unique_variants(name: str, base_type: str) -> tuple[tuple[str, str | None], ...]:
+    """同名・同ベースの公式Trade discriminator候補を返す。"""
+    global _item_entries_cache
+    if _item_entries_cache is None:
+        unique_candidates(base_type)
+    target_name, target_base = name.strip().casefold(), base_type.strip().casefold()
+    variants = {
+        (str(entry.get("text") or entry.get("name") or name),
+         str(entry["disc"]) if entry.get("disc") else None)
+        for entry in (_item_entries_cache or ())
+        if str(entry.get("name", "")).strip().casefold() == target_name
+        and str(entry.get("type", "")).strip().casefold() == target_base
+        and bool((entry.get("flags") or {}).get("unique"))
+    }
+    return tuple(sorted(variants, key=lambda row: (row[1] is not None, row[0])))
+
+
 def _is_unique(item: ParsedItem) -> bool:
     return item.rarity.casefold() in {"unique", "ユニーク"}
 
@@ -705,6 +722,7 @@ def build_search_query(
     trade_currency: str = "any",
     include_corrupted: bool | None = None,
     include_split: bool | None = None,
+    trade_discriminator: str | None = None,
 ) -> dict:
     if trade_status not in TRADE_STATUS_OPTIONS:
         raise ValueError(f"未対応の取引方式です: {trade_status}")
@@ -731,13 +749,16 @@ def build_search_query(
             "filters": {"price": {"option": currency_option}}
         }
     if _is_unique(item) and trade_name and trade_name.strip():
-        query["name"] = trade_name.strip()
+        query["name"] = ({"option": trade_name.strip(), "discriminator": trade_discriminator}
+                         if trade_discriminator else trade_name.strip())
     if _is_unique(item) and "unidentified" in item.flags:
         query["filters"].setdefault("misc_filters", {"filters": {}})["filters"]["identified"] = {"option": "false"}
     rarity = item.rarity.lower()
     rarity_option = "nonunique" if preset == PRESET_BASE else {
         "レア": "rare", "rare": "rare", "ユニーク": "unique", "unique": "unique",
     }.get(rarity)
+    if "foil" in item.flags:
+        rarity_option = "uniquefoil"
     if rarity_option:
         query["filters"]["type_filters"] = {"filters": {"rarity": {"option": rarity_option}}}
     if preset == PRESET_BASE:
@@ -761,6 +782,8 @@ def build_search_query(
             misc["mirrored"] = {"option": "true"}
         if not include_split:
             misc["split"] = {"option": "false"}
+        if "foulborn" not in item.flags:
+            misc["foulborn_item"] = {"option": "false"}
     for stat_filter in stat_filters:
         if not stat_filter.enabled:
             continue
@@ -804,11 +827,12 @@ def search_prices(
     trade_currency: str = "any",
     include_corrupted: bool | None = None,
     include_split: bool | None = None,
+    trade_discriminator: str | None = None,
 ) -> PriceResult:
     league = league or active_pc_league()
     payload = build_search_query(
         item, trade_base_type, stat_filters, trade_status, trade_name, preset,
-        trade_currency, include_corrupted, include_split,
+        trade_currency, include_corrupted, include_split, trade_discriminator,
     )
     search_url = f"{API_ROOT}/search/{quote(league, safe='')}"
     _trade_log(

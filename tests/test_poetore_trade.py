@@ -5,7 +5,7 @@ from src.poetore.trade import (
     PRESET_BASE, PRESET_FINISHED, PriceListing, PriceResult, TradeStatFilter,
     active_pc_league, available_trade_presets, build_search_query, elemental_dps,
     default_trade_currency, physical_dps, physical_dps_at_20_quality,
-    resolve_trade_stat_filters, search_prices, unique_candidates,
+    resolve_trade_stat_filters, search_prices, unique_candidates, unique_variants,
 )
 
 
@@ -592,6 +592,59 @@ def test_unique_candidates_come_from_official_item_data():
         "src.poetore.trade._request_json", return_value=(payload, {}),
     ):
         assert unique_candidates("Gold Amulet") == ("Another Example", "The Example")
+
+
+def test_unique_variants_preserve_trade_discriminator():
+    entries = (
+        {"name": "Auxium", "type": "Chain Belt", "text": "Auxium Chain Belt", "flags": {"unique": True}},
+        {"name": "Auxium", "type": "Chain Belt", "text": "Auxium Chain Belt (Legacy)", "disc": "legacy", "flags": {"unique": True}},
+    )
+    with patch("src.poetore.trade._item_entries_cache", entries):
+        assert unique_variants("Auxium", "Chain Belt") == (
+            ("Auxium Chain Belt", None), ("Auxium Chain Belt (Legacy)", "legacy"),
+        )
+
+
+def test_unique_variant_foil_and_foulborn_conditions_are_sent_exactly():
+    foil = parse_item_text("""Item Class: Belts
+Rarity: Unique
+Auxium
+Chain Belt
+--------
+Item Level: 70
+--------
+Foil
+""")
+    query = build_search_query(
+        foil, "Chain Belt", trade_name="Auxium", trade_discriminator="legacy",
+    )["query"]
+    assert query["name"] == {"option": "Auxium", "discriminator": "legacy"}
+    assert query["filters"]["type_filters"]["filters"]["rarity"] == {"option": "uniquefoil"}
+    assert query["filters"]["misc_filters"]["filters"]["foulborn_item"] == {"option": "false"}
+
+    foulborn = parse_item_text(foil.raw_text.replace("Foil", "Foulborn"))
+    misc = build_search_query(foulborn, "Chain Belt", trade_name="Auxium")["query"]["filters"]["misc_filters"]["filters"]
+    assert "foulborn_item" not in misc
+
+
+def test_crafted_affix_header_is_counted_for_exact_empty_slots():
+    item = parse_item_text("""アイテムクラス: 指輪
+レアリティ: レア
+試作品
+ルビーの指輪
+--------
+アイテムレベル: 85
+--------
+{ プレフィックスモッド「健康な」 (ティア: 1) }
+最大ライフ +100(90-100)
+{ マスタークラフト サフィックスモッド「製作の」 }
+火耐性 +20%
+""")
+    empty = {row.stat_id: row.text for row in resolve_trade_stat_filters(item) if row.kind == "craft"}
+    assert empty == {
+        "pseudo.pseudo_number_of_empty_prefix_mods": "空きPrefix枠（現在2枠）",
+        "pseudo.pseudo_number_of_empty_suffix_mods": "空きSuffix枠（現在2枠）",
+    }
 
 
 def test_trade_status_modes_map_to_official_api_options():

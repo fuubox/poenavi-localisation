@@ -16,6 +16,7 @@ from .trade import (
     PRESET_BASE, PRESET_FINISHED, PriceResult, TradeApiError, TradeStatFilter,
     available_trade_presets, default_trade_currency, resolve_trade_stat_filters, search_prices,
     unique_candidates,
+    unique_variants,
 )
 
 
@@ -23,6 +24,7 @@ class _TradeSignals(QObject):
     completed = Signal(object, object)
     failed = Signal(str)
     unique_candidates_ready = Signal(object)
+    unique_variants_ready = Signal(object)
 
 
 class PoetoreWindow(QWidget):
@@ -80,6 +82,12 @@ class PoetoreWindow(QWidget):
         self.unique_name_combo.hide()
         search_options.addWidget(self.unique_name_label)
         search_options.addWidget(self.unique_name_combo)
+        self.unique_variant_label = QLabel("ユニークVariant:")
+        self.unique_variant_combo = QComboBox()
+        self.unique_variant_label.hide()
+        self.unique_variant_combo.hide()
+        search_options.addWidget(self.unique_variant_label)
+        search_options.addWidget(self.unique_variant_combo)
         search_options.addStretch()
         layout.addLayout(search_options)
 
@@ -145,11 +153,13 @@ class PoetoreWindow(QWidget):
         self._trade_signals.completed.connect(self._search_completed)
         self._trade_signals.failed.connect(self._show_price_error)
         self._trade_signals.unique_candidates_ready.connect(self._show_unique_candidates)
+        self._trade_signals.unique_variants_ready.connect(self._show_unique_variants)
         self._trade_base_type = None
         self._trade_item_name = None
         self._preset_item_key = None
         self._currency_item_key = None
         self._state_item_key = None
+        self._unique_selector_item_key = None
 
     def paste_from_clipboard(self):
         self._trade_base_type = None
@@ -206,6 +216,9 @@ class PoetoreWindow(QWidget):
         except ItemParseError as exc:
             QMessageBox.warning(self, "解析できませんでした", str(exc))
             return
+        if item.raw_text != self._unique_selector_item_key:
+            self._reset_unique_candidates()
+            self._unique_selector_item_key = item.raw_text
         self._configure_trade_presets(item)
         self._configure_trade_currency(item)
         self._configure_item_state_filters(item)
@@ -250,6 +263,9 @@ class PoetoreWindow(QWidget):
         needs_initial_filters = self.mod_filter_tree.topLevelItemCount() == 0
         selected_unique_name = self.unique_name_combo.currentData() if self.unique_name_combo.isVisible() else None
         trade_name = str(selected_unique_name or self._trade_item_name or "").strip() or None
+        selected_discriminator = (
+            self.unique_variant_combo.currentData() if self.unique_variant_combo.isVisible() else None
+        )
 
         def run():
             try:
@@ -265,6 +281,11 @@ class PoetoreWindow(QWidget):
                     resolved_trade_name = candidates[0]
                 else:
                     resolved_trade_name = trade_name
+                if resolved_trade_name and item.rarity.casefold() in {"unique", "ユニーク"}:
+                    variants = unique_variants(resolved_trade_name, self._trade_base_type or item.base_type)
+                    if len(variants) > 1 and not self.unique_variant_combo.isVisible():
+                        self._trade_signals.unique_variants_ready.emit(variants)
+                        return
                 result = search_prices(
                     item, self._trade_base_type, stat_filters=effective_filters,
                     trade_status=trade_status, trade_name=resolved_trade_name,
@@ -272,6 +293,7 @@ class PoetoreWindow(QWidget):
                     trade_currency=trade_currency,
                     include_corrupted=include_corrupted,
                     include_split=include_split,
+                    trade_discriminator=str(selected_discriminator) if selected_discriminator else None,
                 )
             except (TradeApiError, ValueError) as exc:
                 self._trade_signals.failed.emit(str(exc))
@@ -342,6 +364,9 @@ class PoetoreWindow(QWidget):
         self.unique_name_combo.clear()
         self.unique_name_combo.hide()
         self.unique_name_label.hide()
+        self.unique_variant_combo.clear()
+        self.unique_variant_combo.hide()
+        self.unique_variant_label.hide()
 
     def _show_unique_candidates(self, candidates):
         self.price_button.setEnabled(True)
@@ -352,6 +377,17 @@ class PoetoreWindow(QWidget):
         self.unique_name_combo.show()
         self.price_status.setText(
             f"同じベースの未鑑定ユニークが{len(candidates)}種類あります。候補を選んで「価格を検索」を押してください。"
+        )
+
+    def _show_unique_variants(self, variants):
+        self.price_button.setEnabled(True)
+        self.unique_variant_combo.clear()
+        for label, discriminator in variants:
+            self.unique_variant_combo.addItem(str(label), discriminator)
+        self.unique_variant_label.show()
+        self.unique_variant_combo.show()
+        self.price_status.setText(
+            f"同名ユニークに{len(variants)}種類のVariantがあります。候補を選んで再検索してください。"
         )
 
     def _selected_stat_filters(self) -> tuple[TradeStatFilter, ...]:

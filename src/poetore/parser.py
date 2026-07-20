@@ -36,6 +36,8 @@ _FLAG_LINES = {
     "分割": "split", "スプリット": "split", "Split": "split",
     "Synthesised Item": "synthesised", "Synthesised": "synthesised",
     "シンセサイズアイテム": "synthesised", "シンセサイズ済みアイテム": "synthesised",
+    "Foil": "foil", "Foil Unique": "foil", "フォイル": "foil", "フォイルユニーク": "foil",
+    "Foulborn": "foulborn", "Foulborn Item": "foulborn", "穢れしアイテム": "foulborn",
     "Shaper Item": "influence:shaper", "シェイパーアイテム": "influence:shaper",
     "シェイパーのアイテム": "influence:shaper",
     "Elder Item": "influence:elder", "エルダーアイテム": "influence:elder",
@@ -239,11 +241,17 @@ def parse_item_text(text: str) -> ParsedItem:
             from_header = kind == current_header_kind
             metadata, confidence = default_metadata_index().match(line, kind)
             roll_min, roll_max = _roll_bounds(line)
+            inferred_affix = None
+            if metadata and kind == "crafted":
+                generations = {tier.generation for tier in metadata.tiers
+                               if tier.generation in {"prefix", "suffix"}}
+                if len(generations) == 1:
+                    inferred_affix = generations.pop()
             modifiers.append(ItemModifier(
                 text=line, values=_numbers(line), kind=kind,
                 tier=current_header_tier if from_header else None,
                 affix=current_header_affix if from_header else (
-                    kind if kind in {"prefix", "suffix"} else None
+                    kind if kind in {"prefix", "suffix"} else inferred_affix
                 ),
                 group=current_modifier_group if from_header else None,
                 ref=metadata.ref if metadata else None,
