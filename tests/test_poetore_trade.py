@@ -1,8 +1,10 @@
 from io import BytesIO
+import json
 from unittest.mock import MagicMock, patch
 from urllib.error import HTTPError
 
 from src.poetore.parser import parse_item_text
+from src.poetore.models import ItemModifier, ParsedItem
 from src.poetore.trade import (
     PRESET_BASE, PRESET_FINISHED, PriceListing, PriceResult, TradeStatFilter,
     active_pc_league, available_trade_presets, build_search_query, elemental_dps,
@@ -10,6 +12,7 @@ from src.poetore.trade import (
     resolve_trade_stat_filters, search_prices, unique_candidates, unique_variants,
 )
 from src.poetore.trade import _request_json
+from src.poetore.trade import _base_defence_percentile
 
 
 ITEM = """Item Class: Two Hand Swords
@@ -388,9 +391,96 @@ Sacred Chainmail
     assert enabled == {
         "property.armour": 2646.0,
         "property.energy_shield": 577.8,
+        "property.base_percentile": 90.0,
         "property.quality": 30.0,
     }
     assert item.flags == ("split", "influence:crusader", "influence:warlord")
+
+
+def test_armour_base_percentile_block_and_memory_strands_build_official_filters(tmp_path, monkeypatch):
+    metadata_path = tmp_path / "metadata.json"
+    metadata_path.write_text(json.dumps({
+        "base_armour": {"sacred chainmail": {"ar": [723, 831]}}, "mods": [],
+    }), encoding="utf-8")
+    monkeypatch.setenv("POETORE_METADATA_PATH", str(metadata_path))
+    item = parse_item_text("""Item Class: Body Armours
+Rarity: Rare
+Test Plate
+Sacred Chainmail
+--------
+Armour: 777
+Chance to Block: 25%
+Memory Strands: 70
+--------
+Item Level: 85
+""")
+    with patch("src.poetore.trade._trade_stat_entries", return_value=()):
+        filters = resolve_trade_stat_filters(item, trade_base_type="Sacred Chainmail")
+    by_id = {row.stat_id: row for row in filters}
+    assert by_id["property.base_percentile"].read_value == 50.0
+    assert by_id["property.base_percentile"].min_value == 45.0
+    assert by_id["property.base_percentile"].enabled is True
+    assert by_id["property.block"].enabled is False
+    assert by_id["property.memory_strands"].min_value == 63.0
+    assert by_id["property.memory_strands"].enabled is True
+    query = build_search_query(item, "Sacred Chainmail", filters)["query"]["filters"]
+    assert query["armour_filters"]["filters"]["base_defence_percentile"] == {"min": 45.0}
+    assert query["misc_filters"]["filters"]["memory_level"] == {"min": 63.0}
+    block_query = build_search_query(item, "Sacred Chainmail", (
+        TradeStatFilter("property.block", "ブロック率", 22.5, "property", True),
+    ))["query"]["filters"]
+    assert block_query["armour_filters"]["filters"]["block"] == {"min": 22.5}
+
+
+def test_base_percentile_removes_quality_and_local_increase_multiplicatively(tmp_path, monkeypatch):
+    metadata_path = tmp_path / "metadata.json"
+    metadata_path.write_text(json.dumps({
+        "base_armour": {"test armour": {"ar": [100, 200]}}, "mods": [],
+    }), encoding="utf-8")
+    monkeypatch.setenv("POETORE_METADATA_PATH", str(metadata_path))
+    item = ParsedItem(
+        item_class="Body Armours", rarity="Rare", name="Test", base_type="Test Armour",
+        category="armour", properties={"Armour": "270", "Quality": "+20%"},
+        modifiers=(ItemModifier(
+            "50% increased Armour", values=(50.0,), ref="#% increased Armour",
+        ),),
+    )
+    # 270 / 1.20 / 1.50 = 150。100～200の中央なので50 percentile。
+    assert _base_defence_percentile(item, "Test Armour") == 50.0
+
+
+def test_cluster_jewel_item_level_is_normalized_to_awakened_bracket():
+    item = parse_item_text("""Item Class: Cluster Jewels
+Rarity: Rare
+Test Cluster
+Large Cluster Jewel
+--------
+Item Level: 72
+""")
+    assert item.category == "cluster_jewel"
+    assert available_trade_presets(item) == (PRESET_FINISHED, PRESET_BASE)
+    filters = resolve_trade_stat_filters(item, PRESET_BASE)
+    level = next(row for row in filters if row.stat_id == "property.item_level")
+    assert (level.min_value, level.max_value) == (68.0, 74.0)
+    query = build_search_query(item, "Large Cluster Jewel", filters, preset=PRESET_BASE)["query"]
+    assert query["filters"]["misc_filters"]["filters"]["ilvl"] == {"min": 68.0, "max": 74.0}
+
+
+def test_magic_jewel_search_requires_magic_rarity_and_exact_corruption_state():
+    item = parse_item_text("""Item Class: Jewels
+Rarity: Magic
+Healthy Crimson Jewel
+Crimson Jewel
+--------
+Item Level: 84
+""")
+    assert item.category == "jewel"
+    query = build_search_query(item, "Crimson Jewel")["query"]
+    assert query["filters"]["type_filters"]["filters"]["rarity"] == {"option": "magic"}
+    assert query["filters"]["misc_filters"]["filters"]["corrupted"] == {"option": "false"}
+    corrupted = parse_item_text(item.raw_text + "--------\nCorrupted\n")
+    query = build_search_query(corrupted, "Crimson Jewel")["query"]
+    assert query["filters"]["misc_filters"]["filters"]["corrupted"] == {"option": "true"}
 
 
 def test_quality_sockets_and_item_states_are_added_to_finished_search():

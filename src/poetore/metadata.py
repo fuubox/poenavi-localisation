@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from functools import lru_cache
 import json
 import os
 from pathlib import Path
@@ -9,6 +10,25 @@ from typing import Iterable
 
 
 INDEX_PATH = Path(__file__).resolve().parents[2] / "data" / "poetore" / "mod_metadata.json"
+
+
+@lru_cache(maxsize=4)
+def _load_base_armour(path: str) -> dict:
+    return json.loads(Path(path).read_text(encoding="utf-8")).get("base_armour", {})
+
+
+def base_armour_bounds(base_type: str, path: Path | None = None) -> dict[str, tuple[float, float]]:
+    """固定済み派生データから防具ベースの可変防御値範囲を返す。"""
+    path = (path or Path(os.environ.get("POETORE_METADATA_PATH", INDEX_PATH))).resolve()
+    if not base_type or not path.exists():
+        return {}
+    row = _load_base_armour(str(path)).get(base_type.strip().casefold(), {})
+    return {
+        key: (float(bounds[0]), float(bounds[1]))
+        for key, bounds in row.items()
+        if key in {"ar", "ev", "es", "ward"}
+        and isinstance(bounds, list) and len(bounds) == 2
+    }
 
 
 def normalize_stat_text(text: str) -> str:

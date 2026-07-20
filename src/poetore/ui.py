@@ -294,7 +294,9 @@ class PoetoreWindow(QWidget):
 
         def run():
             try:
-                initial_filters = resolve_trade_stat_filters(item, preset) if needs_initial_filters else ()
+                initial_filters = resolve_trade_stat_filters(
+                    item, preset, self._trade_base_type,
+                ) if needs_initial_filters else ()
                 effective_filters = initial_filters if needs_initial_filters else filters
                 if item.rarity.casefold() in {"unique", "ユニーク"} and "unidentified" in item.flags and not trade_name:
                     candidates = unique_candidates(self._trade_base_type or item.base_type)
@@ -368,7 +370,9 @@ class PoetoreWindow(QWidget):
         self._state_item_key = key
         self.corrupted_combo.setCurrentIndex(1 if "corrupted" in item.flags else 0)
         self.split_combo.setCurrentIndex(1 if "split" in item.flags else 0)
-        is_equipment = item.category in {"weapon", "armour", "accessory"}
+        is_equipment = item.category in {
+            "weapon", "armour", "accessory", "cluster_jewel", "jewel", "abyss_jewel",
+        }
         self.corrupted_combo.setEnabled(is_equipment)
         self.split_combo.setEnabled(is_equipment)
 

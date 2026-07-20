@@ -28,6 +28,18 @@ def test_builder_joins_awakened_and_japanese_by_trade_id_and_keeps_minimal_field
     assert set(row) == {"ref", "stat_id", "kind", "japanese", "better", "inverted", "exact", "local", "tiers"}
 
 
+def test_builder_keeps_only_variable_base_armour_bounds():
+    items = [
+        json.dumps({"refName": "Sacred Chainmail", "armour": {"ar": [723, 831], "es": [145, 167]}}),
+        json.dumps({"refName": "Fixed Base", "armour": {"ar": [100, 100]}}),
+    ]
+    payload = build_minimal_index([], {"result": []}, awakened_items=items)
+    assert payload["schema_version"] == 2
+    assert payload["base_armour"] == {
+        "sacred chainmail": {"ar": [723, 831], "es": [145, 167]},
+    }
+
+
 def test_metadata_search_bounds_support_minimum_maximum_and_exact():
     assert ModMetadata("r", "id", "explicit", ("被ダメージが#%増加する",), better=-1).search_bounds(20) == (None, 22.0)
     assert ModMetadata("r", "id", "explicit", ("値 #",), better=0).search_bounds(3) == (3, 3)

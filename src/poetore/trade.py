@@ -10,7 +10,7 @@ from urllib.parse import quote
 from urllib.request import Request, urlopen
 
 from .models import ParsedItem
-from .metadata import default_metadata_index, normalize_stat_text
+from .metadata import base_armour_bounds, default_metadata_index, normalize_stat_text
 
 
 API_ROOT = "https://www.pathofexile.com/api/trade"
@@ -64,6 +64,9 @@ _PROPERTY_FILTERS = {
     "property.evasion": ("armour_filters", "ev"),
     "property.energy_shield": ("armour_filters", "es"),
     "property.ward": ("armour_filters", "ward"),
+    "property.block": ("armour_filters", "block"),
+    "property.base_percentile": ("armour_filters", "base_defence_percentile"),
+    "property.memory_strands": ("misc_filters", "memory_level"),
     "property.item_level": ("misc_filters", "ilvl"),
     "property.quality": ("misc_filters", "quality"),
     "property.sockets": ("socket_filters", "sockets"),
@@ -77,6 +80,7 @@ _WEAPON_CRIT_STAT_KEYS = {"2375316951"}
 _ARMOUR_STAT_KEYS = {
     "4052037485", "124859000", "4015621042", "53045048", "1062208444",
     "3484657501", "3321629045", "2451402625", "1999113824", "3523867985",
+    "4253454700",
 }
 
 _RESISTANCE_REFS = {
@@ -290,14 +294,64 @@ def _property_value(item: ParsedItem, *labels: str) -> float | None:
     return None
 
 
+def _memory_strands(item: ParsedItem) -> float | None:
+    return _property_value(
+        item, "メモリーの糸", "記憶の糸", "メモリーストランド", "Memory Strands",
+    )
+
+
+_DEFENCE_REFS = {
+    "ar": ({"+# to Armour"}, {
+        "#% increased Armour", "#% increased Armour and Energy Shield",
+        "#% increased Armour and Evasion", "#% increased Armour, Evasion and Energy Shield",
+    }),
+    "ev": ({"+# to Evasion Rating"}, {
+        "#% increased Evasion Rating", "#% increased Armour and Evasion",
+        "#% increased Evasion and Energy Shield", "#% increased Armour, Evasion and Energy Shield",
+    }),
+    "es": ({"+# to maximum Energy Shield"}, {
+        "#% increased Energy Shield", "#% increased Armour and Energy Shield",
+        "#% increased Evasion and Energy Shield", "#% increased Armour, Evasion and Energy Shield",
+    }),
+    "ward": ({"+# to Ward"}, {"#% increased Ward"}),
+}
+
+
+def _base_defence_percentile(item: ParsedItem, trade_base_type: str | None) -> float | None:
+    bounds = base_armour_bounds(trade_base_type or item.base_type)
+    properties = {
+        "ar": _property_value(item, "アーマー", "防具", "Armour"),
+        "ev": _property_value(item, "回避力", "Evasion Rating"),
+        "es": _property_value(item, "エナジーシールド", "Energy Shield"),
+        "ward": _property_value(item, "Ward"),
+    }
+    quality = _property_value(item, "品質", "Quality") or 0.0
+    for defence in ("ar", "ev", "es", "ward"):
+        total, base_range = properties[defence], bounds.get(defence)
+        if not total or not base_range or base_range[0] == base_range[1]:
+            continue
+        flat_refs, increased_refs = _DEFENCE_REFS[defence]
+        flat = increased = 0.0
+        for modifier in item.modifiers:
+            value = modifier.values[0] if modifier.values else 0.0
+            if modifier.ref in flat_refs:
+                flat += value
+            elif modifier.ref in increased_refs:
+                increased += value
+        rolled_base = total / (1.0 + quality / 100.0) / (1.0 + increased / 100.0) - flat
+        percentile = round((rolled_base - base_range[0]) * 100.0 / (base_range[1] - base_range[0]))
+        return float(min(100, max(0, percentile)))
+    return None
+
+
 def available_trade_presets(item: ParsedItem) -> tuple[str, ...]:
     """完成品を基本とし、未完成でクラフト価値がある装備だけベース検索を追加する。"""
-    if item.category not in {"weapon", "armour", "accessory"} or _is_unique(item):
+    if item.category not in {"weapon", "armour", "accessory", "cluster_jewel", "jewel", "abyss_jewel"} or _is_unique(item):
         return (PRESET_FINISHED,)
     quality = _property_value(item, "品質", "Quality")
     likely_finished = (
         any(modifier.kind == "crafted" for modifier in item.modifiers)
-        or quality == 20
+        or (quality == 20 and _memory_strands(item) is None)
         or "corrupted" in item.flags
         or "mirrored" in item.flags
     )
@@ -305,7 +359,10 @@ def available_trade_presets(item: ParsedItem) -> tuple[str, ...]:
         any(modifier.kind == "fractured" for modifier in item.modifiers)
         or "synthesised" in item.flags
         or any(flag.startswith("influence:") for flag in item.flags)
-        or bool(item.item_level is not None and item.item_level >= 82)
+        or item.category == "cluster_jewel"
+        or (item.category in {"jewel", "abyss_jewel"} and item.rarity.casefold() in {"magic", "マジック"})
+        or bool(item.category not in {"jewel", "abyss_jewel"}
+                and item.item_level is not None and item.item_level >= 82)
     )
     if likely_finished or not has_crafting_value:
         return (PRESET_FINISHED,)
@@ -315,10 +372,18 @@ def available_trade_presets(item: ParsedItem) -> tuple[str, ...]:
 def _base_item_filters(item: ParsedItem) -> tuple[TradeStatFilter, ...]:
     filters: list[TradeStatFilter] = []
     if item.item_level is not None:
-        filters.append(TradeStatFilter(
-            "property.item_level", "アイテムレベル",
-            float(min(item.item_level, 86)), "base", True,
-        ))
+        if item.category == "cluster_jewel":
+            minimum = max(value for value in (1, 50, 68, 75, 84) if value <= item.item_level)
+            maximum = next((value for value in (49, 67, 74, 100) if value >= item.item_level), 100)
+            filters.append(TradeStatFilter(
+                "property.item_level", "アイテムレベル帯", float(minimum), "base", True,
+                max_value=float(maximum), selection_reason="Cluster JewelのMod出現帯へ正規化",
+            ))
+        elif item.category not in {"jewel", "abyss_jewel"}:
+            filters.append(TradeStatFilter(
+                "property.item_level", "アイテムレベル",
+                float(min(item.item_level, 86)), "base", True,
+            ))
     for flag in item.flags:
         if not flag.startswith("influence:"):
             continue
@@ -414,7 +479,7 @@ def _empty_affix_filters(item: ParsedItem) -> tuple[TradeStatFilter, ...]:
     return tuple(filters)
 
 
-def _initial_property_filters(item: ParsedItem) -> list[TradeStatFilter]:
+def _initial_property_filters(item: ParsedItem, trade_base_type: str | None = None) -> list[TradeStatFilter]:
     filters: list[TradeStatFilter] = []
     if item.category == "weapon":
         pdps = physical_dps_at_20_quality(item) or 0
@@ -455,6 +520,24 @@ def _initial_property_filters(item: ParsedItem) -> list[TradeStatFilter]:
         ]
         for stat_id, text, value in present:
             filters.append(TradeStatFilter(stat_id, text, _relaxed(value), "property", True))
+        block = _property_value(item, "ブロック率", "Chance to Block")
+        if block is not None:
+            filters.append(TradeStatFilter(
+                "property.block", "ブロック率", _relaxed(block), "property", False,
+            ))
+        percentile = _base_defence_percentile(item, trade_base_type)
+        if percentile is not None:
+            filters.append(TradeStatFilter(
+                "property.base_percentile", "ベース防御値パーセンタイル",
+                _relaxed(percentile), "property", percentile >= 50,
+                read_value=percentile,
+            ))
+    strands = _memory_strands(item)
+    if strands is not None:
+        filters.append(TradeStatFilter(
+            "property.memory_strands", "メモリーの糸", _relaxed(strands),
+            "property", strands >= 60, read_value=strands,
+        ))
     return filters
 
 
@@ -669,6 +752,8 @@ def _decorate_filters(item: ParsedItem, filters: tuple[TradeStatFilter, ...],
         "property.energy_shield": "防具の主要エナジーシールド値", "property.ward": "防具の主要Ward値",
         "property.links": "リンク数は価格への影響が大きい", "property.white_sockets": "白ソケットを保持",
         "property.quality": "品質20%超を保持", "property.item_level": "クラフト価値のあるアイテムレベル",
+        "property.base_percentile": "防具ベース固有値のロールを保持",
+        "property.memory_strands": "高いメモリーの糸を保持",
     }
     sockets, links, white = _socket_summary(item)
     property_values = {
@@ -764,6 +849,7 @@ def _decorate_filters(item: ParsedItem, filters: tuple[TradeStatFilter, ...],
 
 def resolve_trade_stat_filters(
     item: ParsedItem, preset: str = PRESET_FINISHED,
+    trade_base_type: str | None = None,
 ) -> tuple[TradeStatFilter, ...]:
     if preset not in TRADE_PRESETS:
         raise ValueError(f"未対応の検索プリセットです: {preset}")
@@ -847,12 +933,40 @@ def resolve_trade_stat_filters(
         for row in combined.values() if row.stat_id not in consumed_stat_ids
     )
     if unique_item:
-        return _decorate_filters(item, individual + _item_detail_filters(item), True)
+        special_properties = tuple(
+            row for row in _initial_property_filters(item, trade_base_type)
+            if row.stat_id in {"property.base_percentile", "property.block", "property.memory_strands"}
+        )
+        return _decorate_filters(
+            item, special_properties + individual + _item_detail_filters(item), True,
+        )
     filters = (
-        tuple(_initial_property_filters(item) + _gear_pseudo_filters(item))
+        tuple(_initial_property_filters(item, trade_base_type) + _gear_pseudo_filters(item))
         + individual + _item_detail_filters(item) + _empty_affix_filters(item)
     )
-    return _decorate_filters(item, filters)
+    decorated = list(_decorate_filters(item, filters))
+    if item.category == "cluster_jewel":
+        adjusted = []
+        for row in decorated:
+            if row.ref == "# Added Passive Skills are Jewel Sockets":
+                continue
+            if row.ref == "Adds # Passive Skills" and row.read_value is not None:
+                value = row.read_value
+                minimum, maximum = row.min_value, row.max_value
+                if value == 4:
+                    minimum, maximum = None, 5.0
+                elif value == 5:
+                    minimum, maximum = 5.0, 5.0
+                elif value in {3, 6, 10, 11, 12}:
+                    minimum, maximum = value, None
+                adjusted.append(replace(
+                    row, min_value=minimum, max_value=maximum, enabled=True,
+                    selection_reason="Cluster Jewelの最適Passive数へ正規化",
+                ))
+            else:
+                adjusted.append(row)
+        decorated = adjusted
+    return tuple(decorated)
 
 
 def build_search_query(
@@ -897,6 +1011,7 @@ def build_search_query(
         query["filters"].setdefault("misc_filters", {"filters": {}})["filters"]["identified"] = {"option": "false"}
     rarity = item.rarity.lower()
     rarity_option = "nonunique" if preset == PRESET_BASE else {
+        "ノーマル": "normal", "normal": "normal", "マジック": "magic", "magic": "magic",
         "レア": "rare", "rare": "rare", "ユニーク": "unique", "unique": "unique",
     }.get(rarity)
     if "foil" in item.flags:
@@ -916,7 +1031,7 @@ def build_search_query(
         }
         if not include_split:
             misc["split"] = {"option": "false"}
-    elif item.category in {"weapon", "armour", "accessory"}:
+    elif item.category in {"weapon", "armour", "accessory", "cluster_jewel", "jewel", "abyss_jewel"}:
         misc = query["filters"].setdefault("misc_filters", {"filters": {}})["filters"]
         if not include_corrupted:
             misc["corrupted"] = {"option": "false"}
@@ -926,6 +1041,11 @@ def build_search_query(
             misc["split"] = {"option": "false"}
         if "foulborn" not in item.flags:
             misc["foulborn_item"] = {"option": "false"}
+        if (item.category in {"jewel", "abyss_jewel"}
+                and rarity in {"magic", "マジック"}):
+            misc["corrupted"] = {
+                "option": "true" if "corrupted" in item.flags else "false"
+            }
     for stat_filter in stat_filters:
         if not stat_filter.enabled:
             continue
@@ -943,6 +1063,9 @@ def build_search_query(
             if minimum is not None and group == "socket_filters":
                 minimum = int(minimum)
             value = {"min": minimum} if minimum is not None else {}
+            if stat_filter.max_value is not None:
+                value["max"] = (int(stat_filter.max_value)
+                                if group == "socket_filters" else stat_filter.max_value)
             query["filters"].setdefault(group, {"filters": {}})["filters"][name] = value
             continue
         value = {}

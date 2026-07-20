@@ -65,7 +65,7 @@ def main() -> int:
     args = parser.parse_args()
     lock = _load_json(args.lock)
     source_rows = lock.get("sources", {})
-    required = {"awakened_poe_trade", "jp_trade_api", "repoe_stats", "repoe_mods"}
+    required = {"awakened_poe_trade", "awakened_items", "jp_trade_api", "repoe_stats", "repoe_mods"}
     if set(source_rows) != required:
         raise SystemExit(f"source lock keys mismatch: expected={sorted(required)} actual={sorted(source_rows)}")
 
@@ -110,6 +110,7 @@ def main() -> int:
         jp_trade,
         json.loads(blobs["repoe_stats"]),
         json.loads(blobs["repoe_mods"]),
+        awakened_items=blobs["awakened_items"].decode("utf-8").splitlines(),
         sources=sources,
         generated_at=str(effective_lock["generated_at"]),
     )

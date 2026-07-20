@@ -51,9 +51,28 @@ def _repoe_by_ref(stats: dict, mods: dict) -> dict[str, dict]:
     return result
 
 
+def _base_armour(items_lines: Iterable[str]) -> dict[str, dict[str, list[int]]]:
+    result = {}
+    for line in items_lines:
+        if not line.strip():
+            continue
+        row = json.loads(line)
+        armour = row.get("armour") or {}
+        bounds = {
+            key: [int(value[0]), int(value[1])]
+            for key, value in armour.items()
+            if key in {"ar", "ev", "es", "ward"}
+            and isinstance(value, list) and len(value) == 2 and value[0] != value[1]
+        }
+        if bounds and row.get("refName"):
+            result[str(row["refName"]).strip().casefold()] = bounds
+    return dict(sorted(result.items()))
+
+
 def build_minimal_index(awakened_lines: Iterable[str], jp_trade: dict,
                         repoe_stats: dict | None = None,
                         repoe_mods: dict | None = None,
+                        awakened_items: Iterable[str] = (),
                         sources: dict | None = None,
                         generated_at: str | None = None) -> dict:
     """必要な照合・検索項目だけに縮小した派生インデックスを生成する。"""
@@ -85,10 +104,11 @@ def build_minimal_index(awakened_lines: Iterable[str], jp_trade: dict,
                 })
     records.sort(key=lambda row: (row["kind"], row["stat_id"]))
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "generated_at": generated_at or datetime.now(timezone.utc).isoformat(),
         "sources": sources or {},
         "scope": "PoE1 trade stat matching for weapons, armour and accessories",
+        "base_armour": _base_armour(awakened_items),
         "mods": records,
     }
 
@@ -97,6 +117,15 @@ def validate_minimal_index(payload: dict) -> dict:
     """更新前に、壊れた・曖昧な派生インデックスを検出する。"""
     mods = payload.get("mods", ())
     errors: list[str] = []
+    for base_type, armour in payload.get("base_armour", {}).items():
+        if not base_type or not armour:
+            errors.append("empty base armour record")
+            continue
+        for defence, bounds in armour.items():
+            if (defence not in {"ar", "ev", "es", "ward"}
+                    or not isinstance(bounds, list) or len(bounds) != 2
+                    or bounds[0] >= bounds[1]):
+                errors.append(f"invalid base armour bounds: {base_type}:{defence}={bounds}")
     keys: set[tuple[str, str]] = set()
     matchers: dict[tuple[str, str], list[str]] = {}
     for index, row in enumerate(mods):
