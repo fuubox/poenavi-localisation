@@ -1,5 +1,6 @@
 from src.poetore.merge import merge_normal_and_detailed_copy
 from src.poetore.parser import parse_item_text
+from src.poetore.trade import PRESET_BASE, available_trade_presets, uses_dedicated_exact_preset
 
 
 def test_uses_japanese_name_and_base_with_detailed_mods():
@@ -40,8 +41,8 @@ def test_magic_single_line_name_keeps_display_name_while_detail_can_resolve_base
 アイテムレベル: 84
 """
     detailed = """Item Class: Wands
-Rarity: Magic
-Dissolution Imbued Wand of Torment
+Rarity: Normal
+Superior Imbued Wand
 --------
 Item Level: 84
 """
@@ -49,4 +50,8 @@ Item Level: 84
     item = parse_item_text(merged)
     detailed_item = parse_item_text(detailed)
     assert item.name == item.base_type == "酩薬の 痛憤の 浸潤のワンド"
-    assert detailed_item.name == detailed_item.base_type == "Dissolution Imbued Wand of Torment"
+    assert item.rarity == "マジック"
+    assert PRESET_BASE in available_trade_presets(item)
+    assert not uses_dedicated_exact_preset(item)
+    assert detailed_item.name == detailed_item.base_type == "Superior Imbued Wand"
+    assert detailed_item.rarity == "Normal"
