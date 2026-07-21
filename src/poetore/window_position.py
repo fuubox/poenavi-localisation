@@ -123,14 +123,14 @@ def calculate_panel_position(
     panel_size: QSize,
     margin: int = PANEL_MARGIN,
 ) -> QPoint:
-    """Place beside PoE's stash/inventory panel, matching Awakened's layout."""
+    """Place inward from the PoE panel under the cursor, matching Awakened."""
     width = min(panel_size.width(), max(1, target_rect.width() - margin * 2))
     height = min(panel_size.height(), max(1, target_rect.height() - margin * 2))
     sidebar_width = round(target_rect.height() * POE_SIDEBAR_WIDTH_RATIO)
     if cursor_pos.x() < target_rect.center().x():
-        x = target_rect.right() - sidebar_width - width + 1
-    else:
         x = target_rect.left() + sidebar_width
+    else:
+        x = target_rect.right() - sidebar_width - width + 1
     y = target_rect.top()
     max_x = target_rect.right() - margin - width + 1
     max_y = target_rect.bottom() - margin - height + 1

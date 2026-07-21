@@ -66,7 +66,7 @@ def test_show_poetore_window_is_independent_from_owner(qapp):
         window.close()
 
 
-def test_show_at_context_places_window_opposite_cursor(qapp):
+def test_show_at_context_places_window_inward_from_cursor_side(qapp):
     window = PoetoreWindow()
     try:
         context = PlacementContext(QRect(100, 50, 1920, 1080), QPoint(1700, 400))
@@ -74,7 +74,7 @@ def test_show_at_context_places_window_opposite_cursor(qapp):
             window, "activateWindow"
         ):
             window.show_at_context(context)
-        assert window.pos() == QPoint(766, 50)
+        assert window.pos() == QPoint(494, 50)
     finally:
         window.close()
 
