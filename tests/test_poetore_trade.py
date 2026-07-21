@@ -3,6 +3,7 @@ from dataclasses import replace
 import json
 from unittest.mock import MagicMock, patch
 from urllib.error import HTTPError
+from urllib.parse import parse_qs, urlsplit
 
 from src.poetore.parser import parse_item_text
 from src.poetore.models import ItemModifier, ParsedItem
@@ -1008,12 +1009,19 @@ def test_search_prices_logs_request_payload_and_response_summary(capsys):
 def test_search_result_exposes_japanese_trade_url_and_reuses_cache():
     _trade_response_cache.clear()
     response = ({"id": "qid", "result": [], "total": 0}, {})
+    item = replace(parse_item_text(ITEM), name="破滅の切断", base_type="略奪者の剣")
     with patch("src.poetore.trade._request_json", return_value=response) as request:
-        first = search_prices(parse_item_text(ITEM), "Reaver Sword", "Standard")
-        second = search_prices(parse_item_text(ITEM), "Reaver Sword", "Standard")
+        first = search_prices(item, "Reaver Sword", "Standard")
+        second = search_prices(item, "Reaver Sword", "Standard")
     assert request.call_count == 1
     assert first.cached is False and second.cached is True
-    assert first.web_url == "https://jp.pathofexile.com/trade/search/Standard/qid"
+    parsed_url = urlsplit(first.web_url)
+    assert parsed_url.scheme == "https"
+    assert parsed_url.netloc == "jp.pathofexile.com"
+    assert parsed_url.path == "/trade/search/Standard"
+    web_payload = json.loads(parse_qs(parsed_url.query)["q"][0])
+    assert web_payload["query"]["type"] == "略奪者の剣"
+    assert "qid" not in first.web_url
 
 
 def test_query_supports_option_not_count_and_special_item_states():

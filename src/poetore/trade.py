@@ -1644,10 +1644,30 @@ def search_prices(
         f"completed: query_id={query_id!r} candidates={len(ids)} "
         f"priced_listings={len(listings)} rate_limit={rate_limit!r}"
     )
-    # 検索IDは英語APIで解決済みなので、日本語サイト側の名称翻訳に依存しない。
+    # 検索IDはAPIホストごとに管理されるため、www側のIDをjp側へ渡せない。
+    # 日本語アイテム文から得た名称を使った検索JSONをURLへ埋め込み、
+    # 日本語Trade画面自身に検索状態を読み込ませる。
+    web_payload = json.loads(json.dumps(payload))
+    web_query = web_payload["query"]
+    localized_type = item.base_type.strip()
+    if localized_type:
+        if isinstance(web_query.get("type"), dict):
+            web_query["type"]["option"] = localized_type
+        else:
+            web_query["type"] = localized_type
+    localized_name = item.name.strip()
+    if "name" in web_query and localized_name:
+        if isinstance(web_query["name"], dict):
+            web_query["name"]["option"] = localized_name
+        else:
+            web_query["name"] = localized_name
+    encoded_query = quote(
+        json.dumps(web_payload, ensure_ascii=False, separators=(",", ":")),
+        safe="",
+    )
     web_url = (
-        f"https://jp.pathofexile.com/trade/search/{quote(league, safe='')}/"
-        f"{quote(query_id, safe='')}"
+        f"https://jp.pathofexile.com/trade/search/{quote(league, safe='')}"
+        f"?q={encoded_query}"
     )
     return PriceResult(
         league, query_id, len(ids), tuple(listings), rate_limit,

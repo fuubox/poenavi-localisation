@@ -2138,22 +2138,18 @@ class SettingsDialog(QDialog):
         support_note.setStyleSheet(f"color: rgba(200,200,200,150); font-size: 11px;")
         about_layout.addWidget(support_note)
 
-        # ぽえとれ免責事項
+        # アプリの免責事項
         poetore_separator = QFrame()
         poetore_separator.setFrameShape(QFrame.HLine)
         poetore_separator.setStyleSheet("color: rgba(176,255,123,0.3);")
         about_layout.addWidget(poetore_separator)
 
-        poetore_title = QLabel("ぽえとれについて")
-        poetore_title.setStyleSheet(f"color: {Styles.TEXT_COLOR}; font-size: 16px; font-weight: bold;")
-        about_layout.addWidget(poetore_title)
-
-        self.poetore_disclaimer_label = QLabel(
-            "ぽえとれは無料の非公式ツールです。Grinding Gear Gamesとの提携・承認関係はありません。"
+        self.app_disclaimer_label = QLabel(
+            "ぽえなびは無料の非公式ツールです。Grinding Gear Gamesとの提携・承認関係はありません。"
         )
-        self.poetore_disclaimer_label.setWordWrap(True)
-        self.poetore_disclaimer_label.setStyleSheet("color: rgba(200,200,200,180); font-size: 12px;")
-        about_layout.addWidget(self.poetore_disclaimer_label)
+        self.app_disclaimer_label.setWordWrap(True)
+        self.app_disclaimer_label.setStyleSheet("color: rgba(200,200,200,180); font-size: 12px;")
+        about_layout.addWidget(self.app_disclaimer_label)
 
         about_layout.addStretch()
 

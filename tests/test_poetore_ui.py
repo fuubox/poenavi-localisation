@@ -1,7 +1,7 @@
 from unittest.mock import Mock, patch
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QLabel
 import pytest
 
 from src.poetore.ui import PoetoreWindow, show_poetore_window
@@ -38,10 +38,11 @@ def test_poetore_window_always_accepts_mouse_input(qapp):
 def test_poetore_disclaimer_is_in_app_information(qapp):
     dialog = SettingsDialog(current_config={})
     try:
-        text = dialog.poetore_disclaimer_label.text()
-        assert "無料の非公式ツール" in text
+        text = dialog.app_disclaimer_label.text()
+        assert text.startswith("ぽえなびは無料の非公式ツール")
         assert "提携・承認関係はありません" in text
-        assert dialog.poetore_disclaimer_label.wordWrap()
+        assert dialog.app_disclaimer_label.wordWrap()
+        assert all(label.text() != "ぽえとれについて" for label in dialog.findChildren(QLabel))
     finally:
         dialog.close()
 

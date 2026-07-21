@@ -48,7 +48,9 @@ def test_readme_notices_and_app_wording_cover_required_attribution():
     assert "Awakened PoE Trade" in notices and "MIT License" in notices
     assert "RePoE" in notices and "全データはアプリへ同梱しません" in notices
     assert "無料の非公式ツール" not in poetore_ui
-    assert "無料の非公式ツール" in settings_ui and "提携・承認関係はありません" in settings_ui
+    assert "ぽえなびは無料の非公式ツール" in settings_ui
+    assert "提携・承認関係はありません" in settings_ui
+    assert "ぽえとれについて" not in settings_ui
 
 
 def test_source_lock_is_development_only_and_pins_revision_and_hashes():
