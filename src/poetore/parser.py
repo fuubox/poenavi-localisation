@@ -110,6 +110,11 @@ _UNSCALABLE_VALUE_SUFFIX = re.compile(
 _GLOSSARY_HELP_LINE = re.compile(
     r"^[（(]\s*[^()（）:：\r\n]{1,80}\s*[:：].*[）)]$",
 )
+_JEWEL_HELP_LINES = {
+    "パッシブツリーで割り当てられたジュエルソケットにはめる。右クリックしてソケットから取り外すことができる。",
+    "Place into an allocated Jewel Socket on the Passive Skill Tree. Right click to remove from the Socket.",
+}
+_JEWEL_CATEGORIES = {"jewel", "abyss_jewel", "cluster_jewel"}
 _LOGBOOK_FACTIONS = {
     "Black Scythe Mercenaries": ("Has Logbook Faction: Black Scythe Mercenaries", "pseudo.pseudo_logbook_faction_mercenaries"),
     "黒い鎌の傭兵団": ("Has Logbook Faction: Black Scythe Mercenaries", "pseudo.pseudo_logbook_faction_mercenaries"),
@@ -170,8 +175,10 @@ def _numbers(text: str) -> tuple[float, ...]:
     return tuple(values)
 
 
-def _normalized_modifier_line(line: str) -> str | None:
+def _normalized_modifier_line(line: str, item_category: str | None = None) -> str | None:
     """詳細コピー固有の注釈を除き、検索対象となるMod本文だけを返す。"""
+    if item_category in _JEWEL_CATEGORIES and line.strip() in _JEWEL_HELP_LINES:
+        return None
     if _GLOSSARY_HELP_LINE.fullmatch(line):
         return None
     normalized = _UNSCALABLE_VALUE_SUFFIX.sub("", line).rstrip()
@@ -310,7 +317,7 @@ def parse_item_text(text: str) -> ParsedItem:
                  current_header_generation) = header_details
                 current_modifier_group += 1
                 continue
-            line = _normalized_modifier_line(line)
+            line = _normalized_modifier_line(line, item_category)
             if line is None:
                 continue
             if item_category == "expedition_logbook" and line in _LOGBOOK_FACTIONS:

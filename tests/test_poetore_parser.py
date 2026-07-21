@@ -212,6 +212,43 @@ Item Level: 85
             "+30% to Fire Resistance",
         ])
 
+    def test_ignores_jewel_socket_help_text_in_japanese_and_english(self):
+        japanese = parse_item_text("""アイテムクラス: ジュエル
+レアリティ: レア
+夕暮れの傷跡
+クリムゾンジュエル
+--------
+アイテムレベル: 83
+--------
+パッシブツリーで割り当てられたジュエルソケットにはめる。右クリックしてソケットから取り外すことができる。
+""")
+        english = parse_item_text("""Item Class: Jewels
+Rarity: Rare
+Test Scar
+Crimson Jewel
+--------
+Item Level: 83
+--------
+Place into an allocated Jewel Socket on the Passive Skill Tree. Right click to remove from the Socket.
+""")
+        self.assertEqual(japanese.modifiers, ())
+        self.assertEqual(english.modifiers, ())
+
+    def test_does_not_hide_jewel_help_text_from_unrelated_categories(self):
+        item = parse_item_text("""アイテムクラス: 指輪
+レアリティ: レア
+試作品
+ルビーの指輪
+--------
+アイテムレベル: 83
+--------
+パッシブツリーで割り当てられたジュエルソケットにはめる。右クリックしてソケットから取り外すことができる。
+""")
+        self.assertEqual(
+            [modifier.text for modifier in item.modifiers],
+            ["パッシブツリーで割り当てられたジュエルソケットにはめる。右クリックしてソケットから取り外すことができる。"],
+        )
+
     def test_japanese_modifier_headers_are_classified_and_not_counted(self):
         item = parse_item_text("""アイテムクラス: 両手剣
 レアリティ: レア
