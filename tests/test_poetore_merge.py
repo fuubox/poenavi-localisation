@@ -30,3 +30,23 @@ Item Level: 67
     assert item.base_type == "略奪者の剣"
     assert "{ Prefix Modifier" in merged
     assert "74% increased Physical Damage" in merged
+
+
+def test_magic_single_line_name_keeps_display_name_while_detail_can_resolve_base():
+    normal = """アイテムクラス: ワンド
+レアリティ: マジック
+酩薬の 痛憤の 浸潤のワンド
+--------
+アイテムレベル: 84
+"""
+    detailed = """Item Class: Wands
+Rarity: Magic
+Dissolution Imbued Wand of Torment
+--------
+Item Level: 84
+"""
+    merged = merge_normal_and_detailed_copy(normal, detailed)
+    item = parse_item_text(merged)
+    detailed_item = parse_item_text(detailed)
+    assert item.name == item.base_type == "酩薬の 痛憤の 浸潤のワンド"
+    assert detailed_item.name == detailed_item.base_type == "Dissolution Imbued Wand of Torment"

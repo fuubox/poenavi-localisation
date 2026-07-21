@@ -1192,18 +1192,43 @@ def _trade_stat_entries() -> tuple[dict, ...]:
     return _stat_entries_cache
 
 
-def unique_candidates(base_type: str) -> tuple[str, ...]:
-    """未鑑定ユニークの英語ベースから、公式データの同名検索候補を返す。"""
+def _trade_item_entries() -> tuple[dict, ...]:
     global _item_entries_cache
     if _item_entries_cache is None:
         data, _ = _request_json(f"{API_ROOT}/data/items")
         _item_entries_cache = tuple(
             entry for group in data.get("result", ()) for entry in group.get("entries", ())
         )
+    return _item_entries_cache
+
+
+def resolve_official_base_type(value: str) -> str:
+    """Affix込みのMagic一行名から、公式英語base typeを復元する。"""
+    candidate = _normalize_trade_base_type(value)
+    lowered = candidate.casefold()
+    base_types = {
+        str(entry.get("type", "")).strip()
+        for entry in _trade_item_entries()
+        if str(entry.get("type", "")).strip()
+        and not bool((entry.get("flags") or {}).get("unique"))
+    }
+    exact = next((base for base in base_types if base.casefold() == lowered), None)
+    if exact:
+        return exact
+    matches = [
+        base for base in base_types
+        if re.search(rf"(?<![A-Za-z]){re.escape(base)}(?![A-Za-z])", candidate, re.IGNORECASE)
+    ]
+    return max(matches, key=len) if matches else candidate
+
+
+def unique_candidates(base_type: str) -> tuple[str, ...]:
+    """未鑑定ユニークの英語ベースから、公式データの同名検索候補を返す。"""
+    entries = _trade_item_entries()
     target = base_type.strip().casefold()
     names = {
         str(entry.get("name", "")).strip()
-        for entry in _item_entries_cache
+        for entry in entries
         if str(entry.get("type", "")).strip().casefold() == target
         and bool((entry.get("flags") or {}).get("unique"))
         and str(entry.get("name", "")).strip()
@@ -1213,14 +1238,12 @@ def unique_candidates(base_type: str) -> tuple[str, ...]:
 
 def unique_variants(name: str, base_type: str) -> tuple[tuple[str, str | None], ...]:
     """同名・同ベースの公式Trade discriminator候補を返す。"""
-    global _item_entries_cache
-    if _item_entries_cache is None:
-        unique_candidates(base_type)
+    entries = _trade_item_entries()
     target_name, target_base = name.strip().casefold(), base_type.strip().casefold()
     variants = {
         (str(entry.get("text") or entry.get("name") or name),
          str(entry["disc"]) if entry.get("disc") else None)
-        for entry in (_item_entries_cache or ())
+        for entry in entries
         if str(entry.get("name", "")).strip().casefold() == target_name
         and str(entry.get("type", "")).strip().casefold() == target_base
         and bool((entry.get("flags") or {}).get("unique"))
@@ -1837,6 +1860,9 @@ def search_prices(
     magic_exact: bool = False,
 ) -> PriceResult:
     league = league or active_pc_league()
+    if (item.rarity.casefold() in {"magic", "マジック"}
+            and trade_base_type and item.name == item.base_type):
+        trade_base_type = resolve_official_base_type(trade_base_type)
     payload = build_search_query(
         item, trade_base_type, stat_filters, trade_status, trade_name, preset,
         trade_currency, include_corrupted, include_split, trade_discriminator, listed_within,

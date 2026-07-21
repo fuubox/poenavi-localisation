@@ -14,7 +14,7 @@ from src.poetore.trade import (
     default_pc_league, elemental_dps,
     default_trade_currency, physical_dps, physical_dps_at_20_quality,
     resolve_trade_stat_filters, search_prices, unique_candidates, unique_variants,
-    uses_dedicated_exact_preset,
+    uses_dedicated_exact_preset, resolve_official_base_type,
 )
 from src.poetore.trade import _request_json
 from src.poetore.trade import _base_defence_percentile
@@ -82,6 +82,30 @@ def test_weapon_search_strips_superior_display_prefix_from_base_type():
     item = parse_item_text(ITEM)
     assert build_search_query(item, "Superior Ezomyte Blade")["query"]["type"] == "Ezomyte Blade"
     assert build_search_query(item, "上質な エゾマイトの刃")["query"]["type"] == "エゾマイトの刃"
+
+
+def test_magic_single_line_affixed_name_resolves_longest_official_base():
+    entries = (
+        {"type": "Wand", "flags": {}},
+        {"type": "Imbued Wand", "flags": {}},
+        {"type": "The Imbued Wand", "flags": {"unique": True}},
+    )
+    with patch("src.poetore.trade._trade_item_entries", return_value=entries):
+        assert resolve_official_base_type("Dissolution Imbued Wand of Torment") == "Imbued Wand"
+
+
+def test_search_auto_resolves_magic_single_line_detail_name_before_api():
+    item = ParsedItem(
+        "ワンド", "マジック", "酩薬の 痛憤の 浸潤のワンド",
+        "酩薬の 痛憤の 浸潤のワンド", "weapon", item_level=84,
+    )
+    entries = ({"type": "Imbued Wand", "flags": {}},)
+    response = ({"id": "qid", "result": [], "total": 0}, {}, False)
+    with patch("src.poetore.trade._trade_item_entries", return_value=entries), patch(
+        "src.poetore.trade._cached_request_json", return_value=response,
+    ) as request:
+        search_prices(item, "Dissolution Imbued Wand of Torment", league="Standard")
+    assert request.call_args.args[1]["query"]["type"] == "Imbued Wand"
 
 
 def test_normal_search_rejects_japanese_identity_before_api_request():
