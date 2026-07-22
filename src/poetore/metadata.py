@@ -11,6 +11,7 @@ from typing import Iterable
 
 INDEX_PATH = Path(__file__).resolve().parents[2] / "data" / "poetore" / "mod_metadata.json"
 PSEUDO_RELATIONS_PATH = Path(__file__).resolve().parents[2] / "data" / "poetore" / "pseudo_relations.json"
+PSEUDO_DEFINITIONS_PATH = Path(__file__).resolve().parents[2] / "data" / "poetore" / "pseudo_definitions.json"
 
 
 @lru_cache(maxsize=4)
@@ -46,6 +47,58 @@ def pseudo_relations(path: Path | None = None) -> tuple[dict, ...]:
     if not path.exists():
         return ()
     return tuple(dict(row) for row in _load_payload(str(path)).get("relations", ()))
+
+
+def pseudo_definitions(path: Path | None = None) -> tuple[dict, ...]:
+    """レビュー可能な派生データからpseudoへの寄与refを返す。"""
+    path = (path or PSEUDO_DEFINITIONS_PATH).resolve()
+    if not path.exists():
+        return ()
+    return tuple(dict(row) for row in _load_payload(str(path)).get("definitions", ()))
+
+
+def validate_pseudo_payload(payload: dict, official_stat_ids: set[str] | None = None) -> list[str]:
+    """重複ref・未知stat・replaces循環を更新時に拒否できる形で検証する。"""
+    errors: list[str] = []
+    definitions = payload.get("definitions", ())
+    refs, ids = set(), set()
+    for index, row in enumerate(definitions):
+        ref, stat_id = str(row.get("source_ref", "")), str(row.get("stat_id", ""))
+        if not ref or not stat_id or not str(row.get("label", "")):
+            errors.append(f"definitions[{index}] has empty required field")
+        if ref in refs:
+            errors.append(f"duplicate source_ref: {ref}")
+        refs.add(ref)
+        ids.add(stat_id)
+        if official_stat_ids is not None and stat_id not in official_stat_ids:
+            errors.append(f"unknown stat_id: {stat_id}")
+    replaces = {
+        str(row["stat_id"]): str(row["replaces"])
+        for row in payload.get("relations", ()) if row.get("replaces")
+    }
+    for start in replaces:
+        seen, current = set(), start
+        while current in replaces:
+            if current in seen:
+                errors.append(f"cyclic replaces: {start}")
+                break
+            seen.add(current)
+            current = replaces[current]
+    return errors
+
+
+def diff_pseudo_payloads(previous: dict, candidate: dict) -> dict[str, int]:
+    """pseudo更新レビュー用に追加・削除・変更件数を返す。"""
+    def keyed(payload: dict) -> dict[str, dict]:
+        return {str(row.get("source_ref", "")): row for row in payload.get("definitions", ())}
+    old, new = keyed(previous), keyed(candidate)
+    return {
+        "previous": len(old),
+        "candidate": len(new),
+        "added": len(set(new) - set(old)),
+        "removed": len(set(old) - set(new)),
+        "changed": sum(old[key] != new[key] for key in set(old) & set(new)),
+    }
 
 
 def normalize_stat_text(text: str) -> str:

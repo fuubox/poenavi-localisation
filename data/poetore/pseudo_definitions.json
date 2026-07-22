@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "source_revision": "fa31bfb",
+  "source_sha256": "50209531e87e8d3d2f87d98b51ca6371dd4c2c2e4dce9c37302333e44c0a4b70",
+  "categories": ["weapon", "armour", "accessory"],
+  "definitions": [
+    {"source_ref":"#% increased maximum Energy Shield","stat_id":"pseudo.pseudo_increased_energy_shield","label":"最大ES増加率合計"},
+    {"source_ref":"+# to maximum Energy Shield","stat_id":"pseudo.pseudo_total_energy_shield","label":"最大ES合計"},
+    {"source_ref":"#% increased Attack Speed","stat_id":"pseudo.pseudo_total_attack_speed","label":"アタックスピード合計"},
+    {"source_ref":"#% increased Cast Speed","stat_id":"pseudo.pseudo_total_cast_speed","label":"キャストスピード合計"},
+    {"source_ref":"#% increased Movement Speed","stat_id":"pseudo.pseudo_increased_movement_speed","label":"移動スピード"},
+    {"source_ref":"#% increased Global Physical Damage","stat_id":"pseudo.pseudo_increased_physical_damage","label":"物理ダメージ増加合計"},
+    {"source_ref":"#% increased Global Critical Strike Chance","stat_id":"pseudo.pseudo_global_critical_strike_chance","label":"グローバルクリティカル率"},
+    {"source_ref":"+#% to Global Critical Strike Multiplier","stat_id":"pseudo.pseudo_global_critical_strike_multiplier","label":"グローバルクリティカル倍率"},
+    {"source_ref":"#% increased Elemental Damage","stat_id":"pseudo.pseudo_increased_elemental_damage","label":"元素ダメージ増加"},
+    {"source_ref":"#% increased Lightning Damage","stat_id":"pseudo.pseudo_increased_lightning_damage","label":"雷ダメージ増加"},
+    {"source_ref":"#% increased Cold Damage","stat_id":"pseudo.pseudo_increased_cold_damage","label":"冷気ダメージ増加"},
+    {"source_ref":"#% increased Fire Damage","stat_id":"pseudo.pseudo_increased_fire_damage","label":"火ダメージ増加"},
+    {"source_ref":"#% increased Spell Damage","stat_id":"pseudo.pseudo_increased_spell_damage","label":"スペルダメージ増加"},
+    {"source_ref":"#% increased Lightning Spell Damage","stat_id":"pseudo.pseudo_increased_lightning_spell_damage","label":"雷スペルダメージ増加"},
+    {"source_ref":"#% increased Cold Spell Damage","stat_id":"pseudo.pseudo_increased_cold_spell_damage","label":"冷気スペルダメージ増加"},
+    {"source_ref":"#% increased Fire Spell Damage","stat_id":"pseudo.pseudo_increased_fire_spell_damage","label":"火スペルダメージ増加"},
+    {"source_ref":"Regenerate # Life per second","stat_id":"pseudo.pseudo_total_life_regen","label":"毎秒ライフ自動回復"},
+    {"source_ref":"Regenerate #% of Life per second","stat_id":"pseudo.pseudo_percent_life_regen","label":"毎秒ライフ自動回復率"},
+    {"source_ref":"#% of Physical Attack Damage Leeched as Life","stat_id":"pseudo.pseudo_physical_attack_damage_leeched_as_life","label":"物理アタックのライフリーチ"},
+    {"source_ref":"#% of Physical Attack Damage Leeched as Mana","stat_id":"pseudo.pseudo_physical_attack_damage_leeched_as_mana","label":"物理アタックのマナリーチ"},
+    {"source_ref":"#% increased Mana Regeneration Rate","stat_id":"pseudo.pseudo_increased_mana_regen","label":"マナ自動回復レート"},
+    {"source_ref":"#% increased Spell Critical Strike Chance","stat_id":"pseudo.pseudo_critical_strike_chance_for_spells","label":"スペルクリティカル率合計","relational":true},
+    {"source_ref":"#% increased Elemental Damage with Attack Skills","stat_id":"pseudo.pseudo_increased_elemental_damage_with_attack_skills","label":"アタックスキルの元素ダメージ増加","relational":true},
+    {"source_ref":"#% increased Burning Damage","stat_id":"pseudo.pseudo_increased_burning_damage","label":"燃焼ダメージ増加","relational":true}
+  ]
+}

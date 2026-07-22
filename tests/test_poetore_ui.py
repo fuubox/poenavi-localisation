@@ -1,6 +1,8 @@
 from unittest.mock import Mock, patch
 from dataclasses import replace
 from datetime import datetime, timezone
+import csv
+from pathlib import Path
 
 from PySide6.QtCore import QPoint, QRect, QSize, Qt
 from PySide6.QtTest import QTest
@@ -1064,6 +1066,46 @@ def test_filter_chips_follow_awakened_order_in_shared_flow_layout(qapp):
         )
     finally:
         window.close()
+
+
+def test_cross_category_transitions_clear_chips_notice_and_restore_preset(qapp):
+    window = PoetoreWindow()
+    try:
+        samples = (
+            ("""Item Class: Skill Gems\nRarity: Gem\nArc\n--------\nLevel: 20\nQuality: +20%\n""", "専用検索"),
+            ("""アイテムクラス: マップ\nレアリティ: レア\nTest\nMap (Tier 16)\n--------\nアイテムレベル: 85\n""", "専用検索"),
+            ("""Item Class: Two Hand Swords\nRarity: Rare\nTest\nReaver Sword\n--------\nItem Level: 85\n""", "完成品"),
+            ("""アイテムクラス: その他マップアイテム\nレアリティ: カレンシー\nアルティメイタムの刻印\n""", "専用検索"),
+        )
+        with patch("src.poetore.ui.resolve_trade_stat_filters", return_value=()):
+            for text, preset_label in samples:
+                window.input_edit.setPlainText(text)
+                window.parse_current_text()
+                assert window.trade_preset_combo.currentText() == preset_label
+        assert window.gem_level_tag.isHidden()
+        assert window.gem_quality_tag.isHidden()
+        assert window.map_tier_chip.isHidden()
+        assert not window.search_scope_notice.isHidden()
+
+        window.input_edit.setPlainText(samples[2][0])
+        with patch("src.poetore.ui.resolve_trade_stat_filters", return_value=()):
+            window.parse_current_text()
+        assert window.search_scope_notice.isHidden()
+        assert window.trade_preset_combo.currentText() == "完成品"
+        assert window.map_tier_chip.isHidden()
+    finally:
+        window.close()
+
+
+def test_windows_acceptance_csv_has_complete_ordered_cases():
+    path = Path("docs/poetore-windows-acceptance-tests.csv")
+    with path.open(encoding="utf-8-sig", newline="") as handle:
+        rows = list(csv.DictReader(handle))
+    assert len(rows) == 40
+    assert [row["ID"] for row in rows] == [f"WIN-{index:03d}" for index in range(1, 41)]
+    required = {"ID", "区分", "優先度", "前提条件", "テストデータ", "手順", "期待結果", "結果", "証跡", "備考"}
+    assert set(rows[0]) == required
+    assert all(row["手順"] and row["期待結果"] for row in rows)
 
 
 def test_filter_chip_flow_wraps_visible_chips(qapp):

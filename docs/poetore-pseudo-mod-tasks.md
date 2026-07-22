@@ -62,20 +62,20 @@
 
 ## データ設計
 
-- [ ] pseudo定義をコードへの個別直書きから、レビュー可能な派生データへ移す
-- [ ] 各定義にpseudo stat ID、寄与ref、group、replaces、対象カテゴリを保持する
-- [ ] Awakenedの固定コミットと生成物のSHA-256を記録する
-- [ ] 重複ref、循環replaces、存在しないstat IDを生成時に拒否する
-- [ ] 更新時に追加・削除・変更件数をレポートする
+- [x] pseudo定義をコードへの個別直書きから、レビュー可能な派生データへ移す
+- [x] 各定義にpseudo stat ID、寄与ref、group、replaces、対象カテゴリを保持する
+- [x] Awakenedの固定コミットと生成物のSHA-256を記録する
+- [x] 重複ref、循環replaces、存在しないstat IDを生成時に拒否する
+- [x] 更新時に追加・削除・変更件数をレポートする
 
 ## 完了条件
 
-- [ ] 上記3種のpseudoが日本語詳細コピーから正しい値で生成される
-- [ ] group／replaces適用後に、重複または矛盾する検索候補が残らない
-- [ ] 元Mod値の合計、検索用10%緩和値、初期ON/OFFをfixtureで固定する
-- [ ] 代表的な武器・防具・アクセサリーの検索JSONを公式Trade APIが受理する
-- [ ] 全体pytest、compileall、Qt offscreen表示スモークが成功する
-- [ ] `docs/poetore-awakened-gap-audit.md` のpseudo Mod項目を「実装済み」へ更新する
+- [x] 上記3種のpseudoが日本語詳細コピーから正しい値で生成される
+- [x] group／replaces適用後に、重複または矛盾する検索候補が残らない
+- [x] 元Mod値の合計、検索用10%緩和値、初期ON/OFFをfixtureで固定する
+- [x] 代表的な武器・防具・アクセサリーの検索JSONを公式Trade APIが受理する
+- [x] 全体pytest、compileall、Qt offscreen表示スモークが成功する
+- [x] `docs/poetore-awakened-gap-audit.md` のpseudo Mod項目を「実装済み」へ更新する
 
 ## 対象外
 

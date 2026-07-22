@@ -1,7 +1,10 @@
 import json
 from pathlib import Path
 
-from src.poetore.metadata import MetadataIndex, ModMetadata, OptionValue, pseudo_relations
+from src.poetore.metadata import (
+    MetadataIndex, ModMetadata, OptionValue, pseudo_definitions, pseudo_relations,
+    diff_pseudo_payloads, validate_pseudo_payload,
+)
 from src.poetore.metadata_builder import (
     build_minimal_index, diff_minimal_indexes, excessive_removal, unresolved_trade_entries,
     validate_minimal_index,
@@ -38,6 +41,49 @@ def test_pseudo_relations_are_fixed_to_audited_awakened_source():
     assert len(relations) == 19
     assert any(row["stat_id"] == "pseudo.pseudo_increased_burning_damage" and
                row["replaces"] == "incr_fire_dmg" for row in relations)
+
+
+def test_pseudo_definitions_are_reviewable_and_validated():
+    definitions = pseudo_definitions()
+    assert len(definitions) == 24
+    assert {row["source_ref"] for row in definitions if row.get("relational")} == {
+        "#% increased Spell Critical Strike Chance",
+        "#% increased Elemental Damage with Attack Skills",
+        "#% increased Burning Damage",
+    }
+    payload = {"definitions": definitions, "relations": pseudo_relations()}
+    assert validate_pseudo_payload(payload, {row["stat_id"] for row in definitions}) == []
+
+
+def test_pseudo_validation_rejects_duplicate_unknown_and_cyclic_data():
+    payload = {
+        "definitions": [
+            {"source_ref": "same", "stat_id": "pseudo.a", "label": "A"},
+            {"source_ref": "same", "stat_id": "pseudo.missing", "label": "B"},
+        ],
+        "relations": [
+            {"stat_id": "pseudo.a", "replaces": "pseudo.b"},
+            {"stat_id": "pseudo.b", "replaces": "pseudo.a"},
+        ],
+    }
+    errors = validate_pseudo_payload(payload, {"pseudo.a"})
+    assert any("duplicate source_ref" in row for row in errors)
+    assert any("unknown stat_id" in row for row in errors)
+    assert any("cyclic replaces" in row for row in errors)
+
+
+def test_pseudo_diff_reports_added_removed_and_changed_counts():
+    previous = {"definitions": [
+        {"source_ref": "same", "stat_id": "pseudo.old"},
+        {"source_ref": "removed", "stat_id": "pseudo.removed"},
+    ]}
+    candidate = {"definitions": [
+        {"source_ref": "same", "stat_id": "pseudo.changed"},
+        {"source_ref": "added", "stat_id": "pseudo.added"},
+    ]}
+    assert diff_pseudo_payloads(previous, candidate) == {
+        "previous": 2, "candidate": 2, "added": 1, "removed": 1, "changed": 1,
+    }
 
 
 def test_builder_keeps_only_variable_base_armour_bounds():

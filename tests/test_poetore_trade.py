@@ -1910,6 +1910,33 @@ def test_map_properties_blight_and_valdo_safety_filters():
     assert map_filters["map_completion_reward"] == {"option": "Mageblood"}
 
 
+def test_valdo_reward_and_multiline_mods_use_official_exact_filters():
+    item = parse_item_text("""アイテムクラス: マップ
+レアリティ: レア
+Befuddling Frontier
+Valdo Map
+--------
+報酬: フォイル 魅惑
+--------
+アイテムレベル: 100
+--------
+{ ユニークモッド }
+ビヨンドからのモンスターは冒涜領域を生成する
+ビヨンドボスはスポーンしない
+{ ユニークモッド }
+モンスターはプレイヤーから2m以内にいる時だけダメージを受ける
+プレイヤーの光半径に対するモッドはこの範囲にも適用される
+--------
+フォイル (天体の翠玉)
+""")
+    filters = resolve_trade_stat_filters(item)
+    by_id = {row.stat_id: row for row in filters}
+    assert by_id["property.map_completion_reward"].option_value == "魅惑"
+    assert by_id["explicit.stat_2624514051"].enabled is True
+    assert by_id["explicit.stat_3791071930"].enabled is True
+    assert by_id["explicit.stat_1095765106"].group_type == "not"
+
+
 def test_detailed_generic_map_type_is_not_sent_as_trade_base_type():
     item = parse_item_text("""アイテムクラス: マップ
 レアリティ: レア

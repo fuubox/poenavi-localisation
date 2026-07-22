@@ -14,7 +14,7 @@ from urllib.request import Request, urlopen
 from .models import ParsedItem
 from .metadata import (
     base_armour_bounds, default_metadata_index, gem_metadata, normalize_stat_text,
-    pseudo_relations,
+    pseudo_definitions, pseudo_relations,
 )
 
 
@@ -178,34 +178,14 @@ _ATTRIBUTE_REFS = {
     "+# to Strength and Dexterity": ("str", "dex"),
     "+# to Dexterity and Intelligence": ("dex", "int"),
 }
-_SIMPLE_PSEUDOS = (
-    ("#% increased maximum Energy Shield", "pseudo.pseudo_increased_energy_shield", "最大ES増加率合計"),
-    ("+# to maximum Energy Shield", "pseudo.pseudo_total_energy_shield", "最大ES合計"),
-    ("#% increased Attack Speed", "pseudo.pseudo_total_attack_speed", "アタックスピード合計"),
-    ("#% increased Cast Speed", "pseudo.pseudo_total_cast_speed", "キャストスピード合計"),
-    ("#% increased Movement Speed", "pseudo.pseudo_increased_movement_speed", "移動スピード"),
-    ("#% increased Global Physical Damage", "pseudo.pseudo_increased_physical_damage", "物理ダメージ増加合計"),
-    ("#% increased Global Critical Strike Chance", "pseudo.pseudo_global_critical_strike_chance", "グローバルクリティカル率"),
-    ("+#% to Global Critical Strike Multiplier", "pseudo.pseudo_global_critical_strike_multiplier", "グローバルクリティカル倍率"),
-    ("#% increased Elemental Damage", "pseudo.pseudo_increased_elemental_damage", "元素ダメージ増加"),
-    ("#% increased Lightning Damage", "pseudo.pseudo_increased_lightning_damage", "雷ダメージ増加"),
-    ("#% increased Cold Damage", "pseudo.pseudo_increased_cold_damage", "冷気ダメージ増加"),
-    ("#% increased Fire Damage", "pseudo.pseudo_increased_fire_damage", "火ダメージ増加"),
-    ("#% increased Spell Damage", "pseudo.pseudo_increased_spell_damage", "スペルダメージ増加"),
-    ("#% increased Lightning Spell Damage", "pseudo.pseudo_increased_lightning_spell_damage", "雷スペルダメージ増加"),
-    ("#% increased Cold Spell Damage", "pseudo.pseudo_increased_cold_spell_damage", "冷気スペルダメージ増加"),
-    ("#% increased Fire Spell Damage", "pseudo.pseudo_increased_fire_spell_damage", "火スペルダメージ増加"),
-    ("Regenerate # Life per second", "pseudo.pseudo_total_life_regen", "毎秒ライフ自動回復"),
-    ("Regenerate #% of Life per second", "pseudo.pseudo_percent_life_regen", "毎秒ライフ自動回復率"),
-    ("#% of Physical Attack Damage Leeched as Life", "pseudo.pseudo_physical_attack_damage_leeched_as_life", "物理アタックのライフリーチ"),
-    ("#% of Physical Attack Damage Leeched as Mana", "pseudo.pseudo_physical_attack_damage_leeched_as_mana", "物理アタックのマナリーチ"),
-    ("#% increased Mana Regeneration Rate", "pseudo.pseudo_increased_mana_regen", "マナ自動回復レート"),
+_PSEUDO_DEFINITIONS = pseudo_definitions()
+_SIMPLE_PSEUDOS = tuple(
+    (row["source_ref"], row["stat_id"], row["label"])
+    for row in _PSEUDO_DEFINITIONS if not row.get("relational")
 )
 
 _RELATIONAL_SOURCE_REFS = {
-    "#% increased Spell Critical Strike Chance",
-    "#% increased Elemental Damage with Attack Skills",
-    "#% increased Burning Damage",
+    row["source_ref"] for row in _PSEUDO_DEFINITIONS if row.get("relational")
 }
 
 
@@ -644,7 +624,10 @@ def _apply_dedicated_exact_rules(
                     if row.better == -1:
                         goodness = 1 - goodness
                     enabled = goodness >= 0.66
-            if item.category == "map" and row.kind in {
+            is_valdo = item.category == "map" and item.base_type.casefold() == "valdo map"
+            if is_valdo and row.kind in {"prefix", "suffix", "explicit"}:
+                enabled = True
+            if item.category == "map" and not is_valdo and row.kind in {
                 "prefix", "suffix", "explicit", "map pseudo",
             }:
                 enabled = False
@@ -919,6 +902,10 @@ def _special_content_filters(item: ParsedItem) -> tuple[TradeStatFilter, ...]:
         elif blight_state == "blighted":
             filters.append(TradeStatFilter("property.map_blighted", "ブライトマップ", None, "map", True))
         completion = item.properties.get("マップ完了報酬") or item.properties.get("Map Completion Reward")
+        if not completion and item.base_type.casefold() == "valdo map":
+            completion = item.properties.get("報酬") or item.properties.get("Reward")
+            if completion:
+                completion = re.sub(r"^(?:フォイル|Foil)\s+", "", completion).strip()
         if completion:
             filters.append(TradeStatFilter(
                 "property.map_completion_reward", f"完了報酬: {completion}", None, "map", True,
@@ -1601,7 +1588,8 @@ def resolve_trade_stat_filters(
     entries = _trade_stat_entries()
     resolved: list[TradeStatFilter] = []
     unique_item = _is_unique(item)
-    for modifier in item.modifiers:
+    modifiers = _combine_valdo_multiline_modifiers(item, entries)
+    for modifier in modifiers:
         if modifier.ref == "Allocates #" and modifier.oils:
             talisman = "talisman" in item.item_class.casefold() or "タリスマン" in item.item_class
             modifiable_amulet = (
@@ -1668,11 +1656,12 @@ def resolve_trade_stat_filters(
                     )
             if unique_item and roll_bounds is not None and modifier.stat_id != str(entry["id"]):
                 value = _unique_minimum(value, roll_bounds)
+            valdo_exact = item.category == "map" and item.base_type.casefold() == "valdo map"
             resolved.append(TradeStatFilter(
                 str(entry["id"]), modifier.text, value, modifier.kind,
-                modifier.ref == "Allocates #" and (
+                valdo_exact or (modifier.ref == "Allocates #" and (
                     "talisman" in item.item_class.casefold() or "タリスマン" in item.item_class
-                ),
+                )),
                 maximum, modifier.ref, modifier.confidence, modifier.inverted,
                 option_value=modifier.option_value, option_text=modifier.option_text,
                 oils=modifier.oils,
@@ -1946,6 +1935,37 @@ def resolve_trade_stat_filters(
             if row.stat_id not in existing_ids
         )
     return tuple(decorated)
+
+
+def _combine_valdo_multiline_modifiers(item: ParsedItem, entries: tuple[dict, ...]) -> tuple:
+    """Valdo固有の複数行statを、公式Tradeの改行テンプレート単位へ戻す。"""
+    if item.category != "map" or item.base_type.casefold() != "valdo map":
+        return item.modifiers
+    official = {
+        _normalized_stat_text(str(entry.get("text", ""))): entry
+        for entry in entries
+        if entry.get("type") == "explicit" and "\n" in str(entry.get("text", ""))
+    }
+    result, index = [], 0
+    while index < len(item.modifiers):
+        matched = None
+        for size in range(min(3, len(item.modifiers) - index), 1, -1):
+            group = item.modifiers[index:index + size]
+            text = "\n".join(row.text for row in group)
+            entry = official.get(_normalized_stat_text(text))
+            if entry:
+                matched = replace(
+                    group[0], text=text, values=tuple(
+                        value for row in group for value in row.values
+                    ), stat_id=str(entry["id"]), confidence=1.0,
+                )
+                result.append(matched)
+                index += size
+                break
+        if matched is None:
+            result.append(item.modifiers[index])
+            index += 1
+    return tuple(result)
 
 
 def build_search_query(
