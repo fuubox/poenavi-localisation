@@ -66,7 +66,7 @@ class MiniNaviStandaloneTest(unittest.TestCase):
         try:
             available = QApplication.primaryScreen().availableGeometry()
 
-            self.assertEqual(overlay.width(), MiniNaviOverlay.COMPACT_DEFAULT_WIDTH)
+            self.assertEqual(overlay.width(), min(MiniNaviOverlay.COMPACT_DEFAULT_WIDTH, available.width()))
             self.assertEqual(overlay.geometry().center().x(), available.center().x())
             self.assertEqual(overlay.geometry().bottom(), available.bottom())
         finally:
