@@ -488,4 +488,11 @@ class ConfigManager:
         default_config = cls._load_default_config_template()
         config = cls._migrate_config(cls._deep_merge(default_config, config))
         config = cls.migrate_pob_import_data_from_config(config)
-        cls._write_json(cls._get_config_path(), config)
+        config_path = Path(cls._get_config_path())
+        if config_path.exists():
+            try:
+                if cls._read_json(config_path) == config:
+                    return
+            except Exception:
+                pass
+        cls._write_json(config_path, config)

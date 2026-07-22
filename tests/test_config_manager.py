@@ -469,6 +469,22 @@ class ConfigManagerTest(unittest.TestCase):
                 self.assertEqual(ConfigManager.effective_poe1_route_act3(loaded), "standard")
                 self.assertEqual(ConfigManager.effective_poe1_route_act8(loaded), "standard")
 
+    def test_save_config_skips_unchanged_content(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            app_dir = Path(tmp) / "app"
+            user_dir = Path(tmp) / "user-data"
+            app_dir.mkdir()
+            user_dir.mkdir()
+            write_default_config(app_dir)
+
+            with patch.dict(os.environ, {ConfigManager.ENV_USER_DATA_DIR: str(user_dir)}), \
+                 patch.object(ConfigManager, "get_app_dir", return_value=app_dir):
+                config = ConfigManager.load_config()
+                with patch.object(ConfigManager, "_write_json", wraps=ConfigManager._write_json) as write_json:
+                    ConfigManager.save_config(config)
+
+            write_json.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()
