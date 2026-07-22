@@ -87,6 +87,21 @@ class MiniNaviStandaloneTest(unittest.TestCase):
             overlay.close()
             main.close()
 
+    def test_compact_mode_hides_experience_level_guide(self):
+        main = QWidget()
+        main.config = {"mini_guide_overlay": {"enabled": True, "display_mode": "compact"}}
+        overlay = MiniNaviOverlay(main)
+        try:
+            overlay.update_content(
+                {"text": "次のエリアへ進む", "direction": "right"},
+                {"player_level": 4, "enemy_level": 5, "status": "🟢 最適"},
+            )
+
+            self.assertFalse(overlay.exp_label.isVisible())
+        finally:
+            overlay.close()
+            main.close()
+
     def test_minimize_hides_only_main_when_mini_navi_is_visible(self):
         window = MainWindow.__new__(MainWindow)
         window._hidden_for_mini_navi = False

@@ -359,7 +359,7 @@ class MiniNaviOverlay(QWidget):
         self.arrow_label.setText(arrow)
         self.arrow_label.setVisible(bool(arrow))
         self.exp_label.setText(self._render_exp_guide(exp_guide))
-        self.exp_label.setVisible(bool(exp_guide))
+        self.exp_label.setVisible(bool(exp_guide) and not self.is_compact_mode())
         self.text_label.setAlignment(Qt.AlignCenter if muted else Qt.AlignVCenter | Qt.AlignLeft)
         self.text_label.setText("<br>".join(self._render_line(line) for line in lines))
         self.area_note_badge.setVisible(bool(has_area_note) and not muted)
@@ -676,10 +676,13 @@ class MiniNaviOverlay(QWidget):
         self._update_text_width_for_current_size()
         self.text_label.adjustSize()
         margins = self.outer.layout().contentsMargins()
+        left_column_height = self.arrow_label.sizeHint().height()
+        if self.exp_label.isVisible():
+            left_column_height += self.exp_label.sizeHint().height()
         needed_height = max(
             self.minimumHeight(),
             self.text_label.sizeHint().height() + margins.top() + margins.bottom() + 14,
-            self.arrow_label.sizeHint().height() + self.exp_label.sizeHint().height() + margins.top() + margins.bottom() + 4,
+            left_column_height + margins.top() + margins.bottom() + 4,
         )
         if self.is_compact_mode():
             available = self._available_screen_geometry()
