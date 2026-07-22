@@ -27,6 +27,8 @@ DEFAULT_GUIDE = {
     },
 }
 
+_GUIDE_DATA_CACHE: dict[str, tuple[int, dict]] = {}
+
 def get_guide_dir():
     """ガイドデータファイルのディレクトリ（exeフォルダ優先 → _MEIPASS）"""
     if getattr(sys, 'frozen', False):
@@ -52,12 +54,22 @@ def get_guide_path(poe_version: str = POE1) -> str:
 def load_guide_data(poe_version: str = POE1) -> dict:
     """ガイドデータを読み込み"""
     path = get_guide_path(poe_version)
-    if os.path.exists(path):
-        try:
-            with open(path, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except Exception as e:
-            print(f"[GuideData] Failed to load ({poe_version}): {e}")
+    try:
+        modified_ns = os.stat(path).st_mtime_ns
+    except OSError:
+        return DEFAULT_GUIDE if poe_version == POE1 else {}
+
+    cached = _GUIDE_DATA_CACHE.get(path)
+    if cached and cached[0] == modified_ns:
+        return cached[1]
+
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        _GUIDE_DATA_CACHE[path] = (modified_ns, data)
+        return data
+    except Exception as e:
+        print(f"[GuideData] Failed to load ({poe_version}): {e}")
     return DEFAULT_GUIDE if poe_version == POE1 else {}
 
 
@@ -79,6 +91,7 @@ def save_guide_data(data: dict, poe_version: str = POE1):
             print(f"[GuideData] Backup: {backup_path}")
         with open(path, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
+        _GUIDE_DATA_CACHE.pop(path, None)
         print(f"[GuideData] Saved ({poe_version}): {path}")
     except Exception as e:
         print(f"[GuideData] Failed to save ({poe_version}): {e}")
