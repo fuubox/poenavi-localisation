@@ -12,6 +12,7 @@ from src.utils.poe_version_data import POE1, POE2, POE_VERSION_ORDER, get_act_li
 from src.utils.zone_master_data import load_zone_master_data, save_zone_master_data
 from src.utils.config_manager import ConfigManager
 from src.utils.area_notes import get_area_note, set_area_note
+import os
 import webbrowser
 
 
@@ -26,6 +27,15 @@ def _mini_navi_flag_section_title(zone_id: str, flag_key: str) -> str:
     if zone_id in ("act8_area13", "act8_area14"):
         return f"通常ルート、かつフラグ成立時: {flag_key}"
     return f"フラグ別: {flag_key}"
+
+
+def _act1_guide_dev_editor_enabled(poe_version: str, zone_id: str) -> bool:
+    """開発用起動時だけPoE1 Act 1の公式ガイド編集を許可する。"""
+    return (
+        os.environ.get("POENAVI_ACT1_GUIDE_DEV") == "1"
+        and poe_version == POE1
+        and zone_id.startswith("act1_")
+    )
 
 def _spinbox_style(width=55, height=28):
     """SpinBox共通スタイル（ボタン押しやすい版）"""
@@ -2559,6 +2569,21 @@ class SettingsDialog(QDialog):
                     self._open_area_note_editor(zid, zname)
                 )
                 row.addWidget(memo_button)
+
+                if _act1_guide_dev_editor_enabled(self.poe_version, zone_id):
+                    guide_button = self._create_small_action_button("📝", "Act 1公式ガイドを編集")
+                    guide_button.clicked.connect(
+                        lambda checked=False, ne=name_edit, zid=zone_id:
+                        self._open_guide_editor(ne, zid)
+                    )
+                    row.addWidget(guide_button)
+
+                    mini_button = self._create_small_action_button("み", "Act 1みになびを編集")
+                    mini_button.clicked.connect(
+                        lambda checked=False, ne=name_edit, zid=zone_id:
+                        self._open_mini_navi_editor(ne, zid)
+                    )
+                    row.addWidget(mini_button)
 
                 row.addStretch()
                 act_layout.addLayout(row)
