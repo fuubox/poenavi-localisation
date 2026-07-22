@@ -5,10 +5,10 @@ import re
 from dataclasses import replace
 from pathlib import Path
 
-from PySide6.QtCore import QEvent, QObject, QPoint, QSize, Qt, QTimer, Signal, QUrl
+from PySide6.QtCore import QEvent, QObject, QPoint, QRect, QSize, Qt, QTimer, Signal, QUrl
 from PySide6.QtGui import QDesktopServices, QIcon, QIntValidator
 from PySide6.QtWidgets import (
-    QAbstractItemView,
+    QAbstractItemView, QLayout,
     QApplication, QComboBox, QFrame, QHBoxLayout, QLabel, QLineEdit, QMessageBox, QPushButton,
     QSizeGrip, QTreeWidget, QTreeWidgetItem, QVBoxLayout, QWidget, QPlainTextEdit, QHeaderView,
 )
@@ -42,6 +42,80 @@ _INFLUENCE_CHIPS = {
     "redeemer": ("Redeemer", "pseudo.pseudo_has_redeemer_influence"),
     "warlord": ("Warlord", "pseudo.pseudo_has_warlord_influence"),
 }
+
+
+class _FlowLayout(QLayout):
+    """表示中の検索チップを利用可能な横幅で自動折り返しするレイアウト。"""
+
+    def __init__(self, parent=None, margin: int = 0, h_spacing: int = 6, v_spacing: int = 6):
+        super().__init__(parent)
+        self._items = []
+        self._h_spacing = h_spacing
+        self._v_spacing = v_spacing
+        self.setContentsMargins(margin, margin, margin, margin)
+
+    def addItem(self, item):
+        self._items.append(item)
+
+    def count(self) -> int:
+        return len(self._items)
+
+    def itemAt(self, index: int):
+        return self._items[index] if 0 <= index < len(self._items) else None
+
+    def takeAt(self, index: int):
+        return self._items.pop(index) if 0 <= index < len(self._items) else None
+
+    def expandingDirections(self):
+        return Qt.Orientations()
+
+    def hasHeightForWidth(self) -> bool:
+        return True
+
+    def heightForWidth(self, width: int) -> int:
+        return self._do_layout(QRect(0, 0, width, 0), test_only=True)
+
+    def setGeometry(self, rect: QRect):
+        super().setGeometry(rect)
+        self._do_layout(rect, test_only=False)
+
+    def sizeHint(self) -> QSize:
+        return self.minimumSize()
+
+    def minimumSize(self) -> QSize:
+        size = QSize()
+        for item in self._items:
+            if item.widget() is not None and item.widget().isHidden():
+                continue
+            size = size.expandedTo(item.minimumSize())
+        margins = self.contentsMargins()
+        return size + QSize(margins.left() + margins.right(), margins.top() + margins.bottom())
+
+    def ordered_widgets(self) -> tuple[QWidget, ...]:
+        return tuple(item.widget() for item in self._items if item.widget() is not None)
+
+    def _do_layout(self, rect: QRect, *, test_only: bool) -> int:
+        margins = self.contentsMargins()
+        available = rect.adjusted(margins.left(), margins.top(), -margins.right(), -margins.bottom())
+        x = available.x()
+        y = available.y()
+        line_height = 0
+        for item in self._items:
+            widget = item.widget()
+            if widget is not None and widget.isHidden():
+                continue
+            hint = item.sizeHint()
+            next_x = x + hint.width()
+            if line_height and next_x > available.right() + 1:
+                x = available.x()
+                y += line_height + self._v_spacing
+                next_x = x + hint.width()
+                line_height = 0
+            if not test_only:
+                item.setGeometry(QRect(QPoint(x, y), hint))
+            x = next_x + self._h_spacing
+            line_height = max(line_height, hint.height())
+        return y + line_height - rect.y() + margins.bottom()
 
 
 class _BinaryToggle(QWidget):
@@ -322,6 +396,27 @@ class PoetoreWindow(QWidget):
         item_header_layout.addLayout(item_scope_layout)
         panel_layout.addWidget(self.item_header)
 
+        # poe.ninjaデータ取得は後続タスク。先に共通情報階層と差し込み口を固定する。
+        self.poe_ninja_price_panel = QFrame()
+        self.poe_ninja_price_panel.setObjectName("poeNinjaPricePanel")
+        ninja_layout = QHBoxLayout(self.poe_ninja_price_panel)
+        ninja_layout.setContentsMargins(8, 5, 8, 5)
+        ninja_layout.setSpacing(8)
+        self.poe_ninja_price_label = QLabel("poe.ninja 参考価格")
+        self.poe_ninja_price_label.setObjectName("poeNinjaPriceLabel")
+        self.poe_ninja_price_value = QLabel("—")
+        self.poe_ninja_price_value.setObjectName("poeNinjaPriceValue")
+        self.poe_ninja_trend_placeholder = QFrame()
+        self.poe_ninja_trend_placeholder.setObjectName("poeNinjaTrendPlaceholder")
+        self.poe_ninja_trend_placeholder.setFixedSize(116, 24)
+        self.poe_ninja_trend_placeholder.setToolTip("7日推移チャート表示予定")
+        ninja_layout.addWidget(self.poe_ninja_price_label)
+        ninja_layout.addWidget(self.poe_ninja_price_value)
+        ninja_layout.addStretch()
+        ninja_layout.addWidget(self.poe_ninja_trend_placeholder)
+        self.poe_ninja_price_panel.hide()
+        panel_layout.addWidget(self.poe_ninja_price_panel)
+
         top_options = QHBoxLayout()
         top_options.setSpacing(6)
         self.trade_league_combo = QComboBox()
@@ -348,8 +443,6 @@ class PoetoreWindow(QWidget):
             "マジックのクラフトベースだけに絞る場合は「マジック完全一致」を選択"
         )
         self.magic_rarity_toggle.hide()
-        panel_layout.addLayout(top_options)
-        panel_layout.addWidget(self.magic_rarity_toggle)
 
         self.trade_status_combo = QComboBox()
         self.trade_status_combo.addItem("インスタントバイアウトのみ", "instant")
@@ -385,8 +478,9 @@ class PoetoreWindow(QWidget):
         unique_options.addStretch()
         panel_layout.addLayout(unique_options)
 
-        item_state_options = QHBoxLayout()
-        item_state_options.setSpacing(6)
+        self.filter_chip_container = QWidget()
+        self.filter_chip_container.setObjectName("filterChipContainer")
+        self.filter_chip_layout = _FlowLayout(self.filter_chip_container, h_spacing=6, v_spacing=6)
         self.item_level_tag = QFrame()
         self.item_level_tag.setObjectName("itemLevelTag")
         self.item_level_tag.setFixedWidth(92)
@@ -419,7 +513,6 @@ class PoetoreWindow(QWidget):
         self.item_level_max_edit.hide()
         item_level_layout.addWidget(self.item_level_max_edit)
         self.item_level_tag.hide()
-        item_state_options.addWidget(self.item_level_tag)
         self.gem_level_tag = QFrame()
         self.gem_level_tag.setObjectName("gemLevelTag")
         self.gem_level_tag.setFixedWidth(132)
@@ -438,7 +531,6 @@ class PoetoreWindow(QWidget):
         self.gem_level_edit.textEdited.connect(self._enable_gem_level_filter)
         gem_level_layout.addWidget(self.gem_level_edit)
         self.gem_level_tag.hide()
-        item_state_options.addWidget(self.gem_level_tag)
         self.gem_quality_tag = QFrame()
         self.gem_quality_tag.setObjectName("gemQualityTag")
         self.gem_quality_tag.setFixedWidth(116)
@@ -457,7 +549,6 @@ class PoetoreWindow(QWidget):
         self.gem_quality_edit.textEdited.connect(self._enable_gem_quality_filter)
         gem_quality_layout.addWidget(self.gem_quality_edit)
         self.gem_quality_tag.hide()
-        item_state_options.addWidget(self.gem_quality_tag)
         self.links_tag = QFrame()
         self.links_tag.setObjectName("linksTag")
         self.links_tag.setFixedWidth(116)
@@ -476,7 +567,6 @@ class PoetoreWindow(QWidget):
         self.links_edit.textEdited.connect(self._enable_links_filter)
         links_layout.addWidget(self.links_edit)
         self.links_tag.hide()
-        item_state_options.addWidget(self.links_tag)
         self.influence_chips = {}
         self._influence_chip_enabled = {}
         for influence, (label, _stat_id) in _INFLUENCE_CHIPS.items():
@@ -490,50 +580,61 @@ class PoetoreWindow(QWidget):
                 lambda checked=False, value=influence: self._toggle_influence_filter(value)
             )
             button.hide()
-            item_state_options.addWidget(button)
             self.influence_chips[influence] = button
         self.unidentified_chip = _CycleButton(
             (("未鑑定", True, False), ("未鑑定を含む", False, False)),
         )
         self.unidentified_chip.hide()
-        item_state_options.addWidget(self.unidentified_chip)
         self.veiled_chip = _CycleButton(
             (("Veiled", True, False), ("Veiledを含む", False, False)),
         )
         self.veiled_chip.hide()
-        item_state_options.addWidget(self.veiled_chip)
         self.foil_chip = _CycleButton(
             (("Foil Unique", True, False), ("通常Unique", False, False)),
         )
         self.foil_chip.hide()
-        item_state_options.addWidget(self.foil_chip)
         self.map_tier_chip = _NumericFilterChip("Tier", 1, 17)
         self.map_tier_chip.setFixedWidth(116)
         self.area_level_chip = _NumericFilterChip("Area Lv", 1, 100)
         self.heist_wings_chip = _NumericFilterChip("公開Wing", 1, 4)
         for chip in (self.map_tier_chip, self.area_level_chip, self.heist_wings_chip):
             chip.hide()
-            item_state_options.addWidget(chip)
         self.blighted_chip = QPushButton()
         self.blighted_chip.setObjectName("readonlyFilterChip")
         self.blighted_chip.hide()
-        item_state_options.addWidget(self.blighted_chip)
         self.completion_reward_chip = QPushButton()
         self.completion_reward_chip.setObjectName("readonlyFilterChip")
         self.completion_reward_chip.hide()
-        item_state_options.addWidget(self.completion_reward_chip)
         self.split_combo = _CycleButton(
             (("スプリット", True, False), ("非スプリット", False, False)),
         )
         self.split_combo.hide()
-        item_state_options.addWidget(self.split_combo)
         self.mirrored_combo = _CycleButton(
             (("ミラー化", True, False), ("非ミラー化", False, False)),
         )
         self.mirrored_combo.hide()
-        item_state_options.addWidget(self.mirrored_combo)
-        item_state_options.addStretch()
-        panel_layout.addLayout(item_state_options)
+        self._filter_chips = (
+            ("links", self.links_tag),
+            ("map_tier", self.map_tier_chip),
+            ("completion_reward", self.completion_reward_chip),
+            ("area_level", self.area_level_chip),
+            ("heist_wings", self.heist_wings_chip),
+            ("blighted", self.blighted_chip),
+            ("item_level", self.item_level_tag),
+            ("gem_level", self.gem_level_tag),
+            ("quality", self.gem_quality_tag),
+            *((f"influence_{name}", self.influence_chips[name]) for name in _INFLUENCE_CHIPS),
+            ("magic_rarity", self.magic_rarity_toggle),
+            ("unidentified", self.unidentified_chip),
+            ("veiled", self.veiled_chip),
+            ("foil", self.foil_chip),
+            ("mirrored", self.mirrored_combo),
+            ("split", self.split_combo),
+        )
+        for _name, chip in self._filter_chips:
+            self.filter_chip_layout.addWidget(chip)
+        panel_layout.addWidget(self.filter_chip_container)
+        panel_layout.addLayout(top_options)
 
         self.weapon_property_label = QLabel("武器性能・検索Mod")
         self.weapon_property_label.setObjectName("sectionTitle")
@@ -647,6 +748,18 @@ class PoetoreWindow(QWidget):
                 background: rgba(5, 5, 5, 205);
                 border: 1px solid rgba(176, 255, 123, 80);
                 border-radius: 4px;
+            }
+            QFrame#poeNinjaPricePanel {
+                background: rgba(22, 28, 20, 205);
+                border: 1px solid rgba(176, 255, 123, 65);
+                border-radius: 4px;
+            }
+            QLabel#poeNinjaPriceLabel { color: #91b87a; font-weight: 700; }
+            QLabel#poeNinjaPriceValue { color: #f4ffed; font-size: 14px; font-weight: 700; }
+            QFrame#poeNinjaTrendPlaceholder {
+                background: rgba(8, 8, 8, 160);
+                border: 1px dashed rgba(145, 184, 122, 100);
+                border-radius: 3px;
             }
             QLabel#itemName {
                 color: #d8ffbd;

@@ -1,7 +1,7 @@
 from unittest.mock import Mock, patch
 from dataclasses import replace
 
-from PySide6.QtCore import QPoint, QRect, Qt
+from PySide6.QtCore import QPoint, QRect, QSize, Qt
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication, QComboBox, QLabel, QPushButton
 import pytest
@@ -780,7 +780,7 @@ Blighted Map (Tier 16)
         window.close()
 
 
-def test_item_level_tag_is_leftmost_editable_state_and_replaces_tree_filter(qapp):
+def test_item_level_tag_is_editable_state_and_replaces_tree_filter(qapp):
     window = PoetoreWindow()
     try:
         item = parse_item_text("""Item Class: Body Armours
@@ -795,8 +795,7 @@ Item Level: 86
         assert window.item_level_edit.text() == "86"
         assert window.item_level_edit.validator().bottom() == 1
         assert window.item_level_edit.validator().top() == 100
-        assert window.item_level_tag.parentWidget() is window._panel
-        assert window.item_level_tag.x() <= window.split_combo.x()
+        assert window.item_level_tag.parentWidget() is window.filter_chip_container
 
         window.item_level_edit.setText("84")
         assert window._selected_item_level() == 84
@@ -824,6 +823,53 @@ Item Level: 86
             "property.item_level", "アイテムレベル", 86.0, "base", True,
         ),))
         assert window.mod_filter_tree.topLevelItemCount() == 0
+    finally:
+        window.close()
+
+
+def test_filter_chips_follow_awakened_order_in_shared_flow_layout(qapp):
+    window = PoetoreWindow()
+    try:
+        assert tuple(name for name, _widget in window._filter_chips) == (
+            "links", "map_tier", "completion_reward", "area_level", "heist_wings",
+            "blighted", "item_level", "gem_level", "quality",
+            "influence_shaper", "influence_elder", "influence_crusader",
+            "influence_hunter", "influence_redeemer", "influence_warlord",
+            "magic_rarity", "unidentified", "veiled", "foil", "mirrored", "split",
+        )
+        assert window.filter_chip_layout.ordered_widgets() == tuple(
+            widget for _name, widget in window._filter_chips
+        )
+    finally:
+        window.close()
+
+
+def test_filter_chip_flow_wraps_visible_chips(qapp):
+    window = PoetoreWindow()
+    try:
+        for _name, chip in window._filter_chips[:9]:
+            chip.show()
+        window.filter_chip_layout.setGeometry(QRect(0, 0, 320, 200))
+        rows = {chip.geometry().y() for _name, chip in window._filter_chips[:9]}
+        assert len(rows) >= 2
+        assert window.filter_chip_layout.heightForWidth(320) > max(
+            chip.sizeHint().height() for _name, chip in window._filter_chips[:9]
+        )
+    finally:
+        window.close()
+
+
+def test_poe_ninja_placeholder_sits_between_header_and_filter_chips(qapp):
+    window = PoetoreWindow()
+    try:
+        panel_layout = window._panel.layout()
+        header_index = panel_layout.indexOf(window.item_header)
+        ninja_index = panel_layout.indexOf(window.poe_ninja_price_panel)
+        chips_index = panel_layout.indexOf(window.filter_chip_container)
+        assert header_index < ninja_index < chips_index
+        assert window.poe_ninja_price_panel.isHidden()
+        assert window.poe_ninja_price_value.text() == "—"
+        assert window.poe_ninja_trend_placeholder.size() == QSize(116, 24)
     finally:
         window.close()
 
