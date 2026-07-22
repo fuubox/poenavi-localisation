@@ -1628,7 +1628,14 @@ class PoetoreWindow(QWidget):
         presets = available_trade_presets(item)
         dedicated_exact = uses_dedicated_exact_preset(item)
         self.trade_preset_combo.blockSignals(True)
-        self.trade_preset_combo.setItemText(0, "専用検索" if dedicated_exact else "完成品")
+        rarity = (item.rarity or "").strip().casefold()
+        if dedicated_exact and rarity in {"normal", "ノーマル"}:
+            primary_label = "ベースアイテム"
+        elif dedicated_exact:
+            primary_label = "専用検索"
+        else:
+            primary_label = "完成品"
+        self.trade_preset_combo.setItemText(0, primary_label)
         self.trade_preset_combo.setSecondAvailable(PRESET_BASE in presets)
         self.trade_preset_combo.setCurrentIndex(0)
         self.trade_preset_combo.setEnabled(len(presets) > 1)

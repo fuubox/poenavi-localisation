@@ -663,6 +663,31 @@ Item Level: 85
         window.close()
 
 
+def test_normal_item_dedicated_exact_is_labeled_as_base_item(qapp):
+    window = PoetoreWindow()
+    try:
+        item = parse_item_text("""アイテムクラス: ワンド
+レアリティ: ノーマル
+Superior Imbued Wand
+--------
+ワンド
+品質: +25% (augmented)
+--------
+アイテムレベル: 83
+--------
+{ 暗黙モッド — ダメージ, キャスター }
+スペルダメージが35(33-37)%増加する""")
+        window._parsed_item = item
+        window._configure_trade_presets(item)
+
+        assert window.trade_preset_combo.count() == 1
+        assert window.trade_preset_combo.currentData() == "finished"
+        assert window.trade_preset_combo.currentText() == "ベースアイテム"
+        assert window.trade_preset_combo._buttons[0].text() == "ベースアイテム"
+    finally:
+        window.close()
+
+
 def test_magic_base_rarity_toggle_is_only_shown_for_magic_base_search(qapp):
     window = PoetoreWindow()
     try:
