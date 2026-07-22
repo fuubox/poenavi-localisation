@@ -98,6 +98,56 @@ class _BinaryToggle(QWidget):
             self.setCurrentIndex(0)
 
 
+class _CycleButton(QPushButton):
+    """1つのボタンで複数の検索状態を順番に切り替える。"""
+
+    currentIndexChanged = Signal(int)
+
+    def __init__(self, options: tuple[tuple[str, object, bool], ...], parent=None):
+        super().__init__(parent)
+        if not options:
+            raise ValueError("options must not be empty")
+        self._options = options
+        self._current_index = 0
+        self.setObjectName("cycleToggle")
+        self.clicked.connect(self._advance)
+        self._sync_state()
+
+    def _advance(self):
+        self.setCurrentIndex((self._current_index + 1) % len(self._options))
+
+    def _sync_state(self):
+        label, _, alert = self._options[self._current_index]
+        self.setText(label)
+        self.setProperty("alert", alert)
+        self.style().unpolish(self)
+        self.style().polish(self)
+
+    def setCurrentIndex(self, index: int):
+        index = int(index) % len(self._options)
+        if index == self._current_index:
+            self._sync_state()
+            return
+        self._current_index = index
+        self._sync_state()
+        self.currentIndexChanged.emit(index)
+
+    def currentData(self):
+        return self._options[self._current_index][1]
+
+    def currentText(self) -> str:
+        return self._options[self._current_index][0]
+
+    def itemData(self, index: int):
+        return self._options[index][1]
+
+    def itemText(self, index: int) -> str:
+        return self._options[index][0]
+
+    def count(self) -> int:
+        return len(self._options)
+
+
 class _PoetoreTitleBar(QWidget):
     """Small draggable title bar for the frameless price-check panel."""
 
@@ -180,8 +230,21 @@ class PoetoreWindow(QWidget):
         )
         self.base_scope_toggle.currentIndexChanged.connect(self._base_scope_changed)
         self.base_scope_toggle.hide()
+        self.corrupted_combo = _CycleButton((
+            ("コラプトのみ", "only", True),
+            ("非コラプトのみ", False, False),
+            ("コラプト品含む", True, False),
+        ))
+        self.corrupted_combo.setToolTip("クリックするたびにコラプト条件を切り替えます")
+        self.corrupted_combo.setCurrentIndex(1)
         item_header_layout.addWidget(self.item_name_label)
-        item_header_layout.addWidget(self.base_scope_toggle)
+        item_scope_layout = QHBoxLayout()
+        item_scope_layout.setContentsMargins(0, 0, 0, 0)
+        item_scope_layout.setSpacing(6)
+        item_scope_layout.addWidget(self.base_scope_toggle, stretch=1)
+        item_scope_layout.addStretch()
+        item_scope_layout.addWidget(self.corrupted_combo)
+        item_header_layout.addLayout(item_scope_layout)
         panel_layout.addWidget(self.item_header)
 
         top_options = QHBoxLayout()
@@ -249,10 +312,6 @@ class PoetoreWindow(QWidget):
 
         item_state_options = QHBoxLayout()
         item_state_options.setSpacing(6)
-        self.corrupted_combo = _BinaryToggle(
-            ("未コラプト", False), ("コラプト品含む", True),
-        )
-        item_state_options.addWidget(self.corrupted_combo)
         self.split_combo = _BinaryToggle(
             ("非スプリット", False), ("スプリット品含む", True),
         )
@@ -408,6 +467,13 @@ class PoetoreWindow(QWidget):
                 border-color: #d8ffbd;
                 font-weight: 700;
             }
+            QPushButton#cycleToggle {
+                background: rgba(26, 26, 26, 225);
+                color: #f4ffed;
+                min-width: 112px;
+                font-weight: 700;
+            }
+            QPushButton#cycleToggle[alert="true"] { color: #ff5757; }
             QPushButton#primaryButton {
                 background: rgba(93, 145, 66, 225);
                 color: #f4ffed;
@@ -760,7 +826,7 @@ class PoetoreWindow(QWidget):
         listed_within_label = self.listed_within_combo.currentText()
         preset = str(self.trade_preset_combo.currentData() or PRESET_FINISHED)
         preset_label = self.trade_preset_combo.currentText()
-        include_corrupted = bool(self.corrupted_combo.currentData())
+        include_corrupted = self.corrupted_combo.currentData()
         include_split = bool(self.split_combo.currentData())
         magic_exact = bool(
             self.magic_rarity_toggle.isVisible() and self.magic_rarity_toggle.currentData()
@@ -878,7 +944,7 @@ class PoetoreWindow(QWidget):
         if key == self._state_item_key:
             return
         self._state_item_key = key
-        self.corrupted_combo.setCurrentIndex(1 if "corrupted" in item.flags else 0)
+        self.corrupted_combo.setCurrentIndex(0 if "corrupted" in item.flags else 1)
         self.split_combo.setCurrentIndex(1 if "split" in item.flags else 0)
         is_equipment = item.category in {
             "weapon", "armour", "accessory", "cluster_jewel", "jewel", "abyss_jewel",

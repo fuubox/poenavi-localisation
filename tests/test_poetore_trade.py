@@ -701,6 +701,17 @@ def test_finished_search_state_filters_can_exclude_or_include_items():
     assert "corrupted" not in included
     assert "split" not in included
 
+    corrupted_only = build_search_query(
+        item, include_corrupted="only", include_split=True,
+    )["query"]["filters"]["misc_filters"]["filters"]
+    assert corrupted_only["corrupted"] == {"option": "true"}
+
+
+def test_search_rejects_unknown_corruption_mode():
+    item = parse_item_text(ITEM)
+    with pytest.raises(ValueError, match="未対応のコラプト条件"):
+        build_search_query(item, include_corrupted="invalid")
+
 
 def test_split_uncorrupted_item_defaults_to_uncorrupted_and_includes_split():
     item = parse_item_text(ITEM + "--------\nSplit\n")

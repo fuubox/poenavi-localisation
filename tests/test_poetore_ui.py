@@ -385,7 +385,7 @@ Item Level: 70
 
 
 @pytest.mark.parametrize("toggle_name", [
-    "trade_preset_combo", "corrupted_combo", "split_combo",
+    "trade_preset_combo", "split_combo",
 ])
 def test_binary_filters_are_two_segment_toggles_without_popups(qapp, toggle_name):
     window = PoetoreWindow()
@@ -397,6 +397,27 @@ def test_binary_filters_are_two_segment_toggles_without_popups(qapp, toggle_name
         assert toggle.currentData() == toggle.itemData(1)
         assert toggle._buttons[1].isChecked()
         assert not toggle._buttons[0].isChecked()
+    finally:
+        window.close()
+
+
+def test_corruption_filter_is_a_three_state_cycle_button(qapp):
+    window = PoetoreWindow()
+    try:
+        toggle = window.corrupted_combo
+        assert toggle.count() == 3
+        assert toggle.currentText() == "非コラプトのみ"
+        assert toggle.currentData() is False
+        toggle.click()
+        assert toggle.currentText() == "コラプト品含む"
+        assert toggle.currentData() is True
+        toggle.click()
+        assert toggle.currentText() == "コラプトのみ"
+        assert toggle.currentData() == "only"
+        assert toggle.property("alert") is True
+        toggle.click()
+        assert toggle.currentText() == "非コラプトのみ"
+        assert toggle.property("alert") is False
     finally:
         window.close()
 
@@ -536,8 +557,9 @@ Item Level: 94
 Split
 """)
         window._configure_item_state_filters(item)
-        assert window.corrupted_combo.itemText(0) == "未コラプト"
-        assert window.corrupted_combo.itemText(1) == "コラプト品含む"
+        assert window.corrupted_combo.itemText(0) == "コラプトのみ"
+        assert window.corrupted_combo.itemText(1) == "非コラプトのみ"
+        assert window.corrupted_combo.itemText(2) == "コラプト品含む"
         assert window.corrupted_combo.currentData() is False
         assert window.split_combo.itemText(0) == "非スプリット"
         assert window.split_combo.itemText(1) == "スプリット品含む"
@@ -545,11 +567,31 @@ Split
         assert not isinstance(window.corrupted_combo, QComboBox)
         assert not isinstance(window.split_combo, QComboBox)
 
-        window.corrupted_combo.setCurrentIndex(1)
+        window.corrupted_combo.setCurrentIndex(2)
         window.split_combo.setCurrentIndex(0)
         window._configure_item_state_filters(item)
         assert window.corrupted_combo.currentData() is True
         assert window.split_combo.currentData() is False
+    finally:
+        window.close()
+
+
+def test_corrupted_item_defaults_to_corrupted_only(qapp):
+    window = PoetoreWindow()
+    try:
+        item = parse_item_text("""Item Class: Rings
+Rarity: Rare
+Test Ring
+Amethyst Ring
+--------
+Item Level: 84
+--------
+Corrupted
+""")
+        window._configure_item_state_filters(item)
+        assert window.corrupted_combo.currentText() == "コラプトのみ"
+        assert window.corrupted_combo.currentData() == "only"
+        assert window.corrupted_combo.property("alert") is True
     finally:
         window.close()
 

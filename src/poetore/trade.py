@@ -1659,7 +1659,7 @@ def build_search_query(
     trade_name: str | None = None,
     preset: str = PRESET_FINISHED,
     trade_currency: str = "any",
-    include_corrupted: bool | None = None,
+    include_corrupted: bool | str | None = None,
     include_split: bool | None = None,
     trade_discriminator: str | None = None,
     listed_within: str = "any",
@@ -1676,8 +1676,11 @@ def build_search_query(
         raise ValueError(f"未対応の出品期間です: {listed_within}")
     if preset == PRESET_BASE and PRESET_BASE not in available_trade_presets(item):
         raise ValueError("このアイテムはクラフトベース検索の対象外です。")
+    corruption_mode_explicit = include_corrupted is not None
     if include_corrupted is None:
         include_corrupted = "corrupted" in item.flags
+    if include_corrupted not in {False, True, "only"}:
+        raise ValueError(f"未対応のコラプト条件です: {include_corrupted}")
     if include_split is None:
         include_split = "split" in item.flags
     base_type = _normalize_trade_base_type(trade_base_type or item.base_type)
@@ -1746,8 +1749,10 @@ def build_search_query(
         type_filters["category"] = {"option": category}
     if preset == PRESET_BASE:
         misc = query["filters"].setdefault("misc_filters", {"filters": {}})["filters"]
-        if not include_corrupted:
-            misc["corrupted"] = {"option": "false"}
+        if include_corrupted != True:
+            misc["corrupted"] = {
+                "option": "true" if include_corrupted == "only" else "false"
+            }
         misc["mirrored"] = {"option": "false"}
         misc["fractured_item"] = {"option": "true" if any(
             modifier.kind == "fractured" for modifier in item.modifiers
@@ -1763,8 +1768,10 @@ def build_search_query(
         stateful = item.category not in {
             "gem", "captured_beast", "currency", "divination_card", "invitation",
         }
-        if stateful and not include_corrupted:
-            misc["corrupted"] = {"option": "false"}
+        if stateful and include_corrupted != True:
+            misc["corrupted"] = {
+                "option": "true" if include_corrupted == "only" else "false"
+            }
         if stateful and "mirrored" in item.flags:
             misc["mirrored"] = {"option": "true"}
         if stateful and not include_split:
@@ -1778,7 +1785,8 @@ def build_search_query(
             misc["tangled_item"] = {"option": "true"}
         if "veiled" in item.flags:
             misc["veiled"] = {"option": "true"}
-        if (item.category in {"jewel", "abyss_jewel"}
+        if (not corruption_mode_explicit
+                and item.category in {"jewel", "abyss_jewel"}
                 and rarity in {"magic", "マジック"}):
             misc["corrupted"] = {
                 "option": "true" if "corrupted" in item.flags else "false"
@@ -1891,7 +1899,7 @@ def search_prices(
     trade_name: str | None = None,
     preset: str = PRESET_FINISHED,
     trade_currency: str = "any",
-    include_corrupted: bool | None = None,
+    include_corrupted: bool | str | None = None,
     include_split: bool | None = None,
     trade_discriminator: str | None = None,
     listed_within: str = "any",
