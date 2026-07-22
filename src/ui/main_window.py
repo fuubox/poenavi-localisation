@@ -3758,11 +3758,11 @@ class MainWindow(QMainWindow):
             ConfigManager.save_config(self.config)
 
     def eventFilter(self, obj, event):
-        """アプリ全体のマウスイベントを監視して端のリサイズを処理"""
+        """本体ウィンドウ内のマウスイベントだけで端のリサイズを処理する。"""
         if event.type() in (QEvent.Type.MouseButtonPress, QEvent.Type.MouseMove, QEvent.Type.MouseButtonRelease):
             # グローバル座標 → ウィンドウ座標
             if event.type() == QEvent.Type.MouseButtonPress and event.button() == Qt.LeftButton:
-                if self.window_locked:
+                if self.window_locked or not self._is_main_window_widget(obj):
                     return False
                 gpos = event.globalPosition().toPoint()
                 edges = self._global_detect_edge(gpos)
@@ -3803,10 +3803,21 @@ class MainWindow(QMainWindow):
                 return True
         
         return super().eventFilter(obj, event)
+
+    def _is_main_window_widget(self, obj):
+        """イベント元が本体または本体配下のウィジェットか判定する。"""
+        widget = obj if isinstance(obj, QWidget) else None
+        while widget is not None:
+            if widget is self:
+                return True
+            widget = widget.parentWidget()
+        return False
     
     def _global_detect_edge(self, gpos):
         """グローバル座標からリサイズ方向を検出"""
         geo = self.frameGeometry()
+        if not geo.contains(gpos):
+            return None
         m = self.EDGE_MARGIN
         edges = []
         if abs(gpos.x() - geo.left()) <= m:
