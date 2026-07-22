@@ -33,6 +33,7 @@ def launcher_candidates(version: str) -> list[Path]:
             program_files / "Epic Games" / "PathOfExile" / "logs" / "Client.txt",
         ]
     return [
+        program_files_x86 / "Grinding Gear Games" / "Path of Exile 2" / "logs" / "Client.txt",
         program_files / "Epic Games" / "PathOfExile2" / "logs" / "Client.txt",
     ]
 
