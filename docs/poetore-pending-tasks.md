@@ -117,6 +117,11 @@
 
 - 公式Web Tradeの旧Bulk Exchangeと独自交換UI
 - Bulk用stack size／stock filter
+- Sentinel Chargeの検索チップ
+  - Sentinel専用の条件だが、ぽえとれではSentinelカテゴリ自体を製品対象外としているため実装しない
+- Stock／スタック数の検索チップ
+  - Currencyやスタック品向けの条件だが、ぽえとれでは旧Bulk Exchangeを対象外としている
+  - 通常Web Trade検索を使う現在の方針では利用価値が低いため実装しない
 - Metamorph Sample
 - Sentinel
 - Voidstone
