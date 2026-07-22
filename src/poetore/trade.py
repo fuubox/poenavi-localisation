@@ -1750,7 +1750,7 @@ def build_search_query(
         "stats": [{"type": "and", "filters": []}],
         "filters": {},
     }
-    if exact_base_type:
+    if exact_base_type and not _is_generic_map_copy_type(item, base_type):
         query["type"] = query_type
     currency_option = TRADE_CURRENCY_OPTIONS[trade_currency]
     if currency_option is not None:
@@ -1960,6 +1960,16 @@ def _normalize_trade_base_type(value: str) -> str:
     normalized = re.sub(r"^Superior\s+", "", normalized, flags=re.IGNORECASE)
     normalized = re.sub(r"^上質な[\s　]*", "", normalized)
     return normalized.strip()
+
+
+def _is_generic_map_copy_type(item: ParsedItem, base_type: str) -> bool:
+    """詳細コピーの汎用Map表記を、公式Tradeのベース名として送らない。"""
+    if item.category != "map":
+        return False
+    return bool(re.fullmatch(
+        r"(?:(?:Blighted|Blight-ravaged)\s+)?Map\s*[（(]\s*Tier\s*\d+\s*[）)]",
+        base_type.strip(), flags=re.IGNORECASE,
+    ))
 
 
 def _contains_japanese_text(value: object) -> bool:

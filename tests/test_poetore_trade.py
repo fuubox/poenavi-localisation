@@ -1545,6 +1545,30 @@ def test_map_properties_blight_and_valdo_safety_filters():
     assert map_filters["map_completion_reward"] == {"option": "Mageblood"}
 
 
+def test_detailed_generic_map_type_is_not_sent_as_trade_base_type():
+    item = parse_item_text("""アイテムクラス: マップ
+レアリティ: レア
+Insane Intent
+Map (Tier 16)
+--------
+アイテム数量: +65% (augmented)
+アイテムレアリティ: +39% (augmented)
+モンスターパックサイズ: +25% (augmented)
+--------
+アイテムレベル: 85
+--------
+モンスターレベル：83
+--------
+{ プレフィックスモッド「凍りつく」 (ティア: 1) }
+モンスターは物理ダメージの98(90-110)%を追加冷気ダメージとして与える
+""")
+    filters = resolve_trade_stat_filters(item, trade_base_type=item.base_type)
+    query = build_search_query(item, item.base_type, filters)["query"]
+
+    assert "type" not in query
+    assert query["filters"]["map_filters"]["filters"]["map_tier"] == {"min": 16.0}
+
+
 def test_dedicated_exact_normal_item_uses_nonunique_ilvl_and_exact_stats_only():
     item = parse_item_text("""Item Class: Two Hand Swords
 Rarity: Normal
