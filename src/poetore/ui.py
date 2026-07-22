@@ -5,8 +5,8 @@ import re
 from dataclasses import replace
 from pathlib import Path
 
-from PySide6.QtCore import QEvent, QObject, QPoint, QRect, QSize, Qt, QTimer, Signal, QUrl
-from PySide6.QtGui import QDesktopServices, QIcon, QIntValidator
+from PySide6.QtCore import QEvent, QObject, QPoint, QPointF, QRect, QSize, Qt, QTimer, Signal, QUrl
+from PySide6.QtGui import QColor, QDesktopServices, QIcon, QIntValidator, QPainter, QPen, QPolygonF
 from PySide6.QtWidgets import (
     QAbstractItemView, QLayout,
     QApplication, QComboBox, QFrame, QHBoxLayout, QLabel, QLineEdit, QMessageBox, QPushButton,
@@ -24,6 +24,7 @@ from .trade import (
     resolve_trade_stat_filters, search_prices, unique_candidates,
     unique_variants, unresolved_modifier_warnings, uses_dedicated_exact_preset,
 )
+from .poe_ninja import PoeNinjaPrice, default_poe_ninja_service
 
 
 class _TradeSignals(QObject):
@@ -32,6 +33,8 @@ class _TradeSignals(QObject):
     unique_candidates_ready = Signal(object)
     unique_variants_ready = Signal(object)
     leagues_ready = Signal(object)
+    poe_ninja_ready = Signal(object, object)
+    poe_ninja_failed = Signal(object)
 
 
 _INFLUENCE_CHIPS = {
@@ -297,6 +300,40 @@ class _NumericFilterChip(QFrame):
         return self._active
 
 
+class _SparklineWidget(QWidget):
+    """poe.ninjaの7日変動率を追加依存なしで描画する。"""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._points: tuple[float, ...] = ()
+        self.setFixedSize(116, 24)
+        self.setToolTip("poe.ninja 7日推移")
+
+    def setPoints(self, points: tuple[float, ...]):
+        self._points = tuple(points)
+        self.update()
+
+    def paintEvent(self, event):
+        super().paintEvent(event)
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setPen(QPen(QColor("#53604f"), 1, Qt.DashLine))
+        middle = self.height() / 2
+        painter.drawLine(0, round(middle), self.width(), round(middle))
+        if len(self._points) < 2:
+            return
+        low, high = min(self._points), max(self._points)
+        spread = max(high - low, 1.0)
+        polygon = QPolygonF()
+        for index, value in enumerate(self._points):
+            x = index * (self.width() - 2) / (len(self._points) - 1) + 1
+            y = 1 + (high - value) * (self.height() - 2) / spread
+            polygon.append(QPointF(x, y))
+        color = "#79d65b" if self._points[-1] >= self._points[0] else "#ff6b6b"
+        painter.setPen(QPen(QColor(color), 1.5))
+        painter.drawPolyline(polygon)
+
+
 class _PoetoreTitleBar(QWidget):
     """Small draggable title bar for the frameless price-check panel."""
 
@@ -406,14 +443,20 @@ class PoetoreWindow(QWidget):
         self.poe_ninja_price_label.setObjectName("poeNinjaPriceLabel")
         self.poe_ninja_price_value = QLabel("—")
         self.poe_ninja_price_value.setObjectName("poeNinjaPriceValue")
-        self.poe_ninja_trend_placeholder = QFrame()
-        self.poe_ninja_trend_placeholder.setObjectName("poeNinjaTrendPlaceholder")
-        self.poe_ninja_trend_placeholder.setFixedSize(116, 24)
-        self.poe_ninja_trend_placeholder.setToolTip("7日推移チャート表示予定")
+        self.poe_ninja_trend_label = QLabel("")
+        self.poe_ninja_trend_label.setObjectName("poeNinjaTrendLabel")
+        self.poe_ninja_trend_chart = _SparklineWidget()
+        # 旧テスト・後続実装から差し込み口を参照できる別名。
+        self.poe_ninja_trend_placeholder = self.poe_ninja_trend_chart
+        self.poe_ninja_open_button = QPushButton("poe.ninja  ↗")
+        self.poe_ninja_open_button.setObjectName("poeNinjaOpenButton")
+        self.poe_ninja_open_button.clicked.connect(self._open_poe_ninja_url)
         ninja_layout.addWidget(self.poe_ninja_price_label)
         ninja_layout.addWidget(self.poe_ninja_price_value)
         ninja_layout.addStretch()
-        ninja_layout.addWidget(self.poe_ninja_trend_placeholder)
+        ninja_layout.addWidget(self.poe_ninja_trend_label)
+        ninja_layout.addWidget(self.poe_ninja_trend_chart)
+        ninja_layout.addWidget(self.poe_ninja_open_button)
         self.poe_ninja_price_panel.hide()
         panel_layout.addWidget(self.poe_ninja_price_panel)
 
@@ -719,6 +762,8 @@ class PoetoreWindow(QWidget):
         self._trade_signals.unique_candidates_ready.connect(self._show_unique_candidates)
         self._trade_signals.unique_variants_ready.connect(self._show_unique_variants)
         self._trade_signals.leagues_ready.connect(self._show_trade_leagues)
+        self._trade_signals.poe_ninja_ready.connect(self._show_poe_ninja_price)
+        self._trade_signals.poe_ninja_failed.connect(self._hide_poe_ninja_price)
         self._trade_base_type = None
         self._trade_item_name = None
         self._preset_item_key = None
@@ -727,6 +772,8 @@ class PoetoreWindow(QWidget):
         self._base_scope_item_key = None
         self._unique_selector_item_key = None
         self._last_trade_url = ""
+        self._last_poe_ninja_url = ""
+        self._poe_ninja_item_key = None
         self.installEventFilter(self)
         for child in self.findChildren(QWidget):
             child.installEventFilter(self)
@@ -756,11 +803,8 @@ class PoetoreWindow(QWidget):
             }
             QLabel#poeNinjaPriceLabel { color: #91b87a; font-weight: 700; }
             QLabel#poeNinjaPriceValue { color: #f4ffed; font-size: 14px; font-weight: 700; }
-            QFrame#poeNinjaTrendPlaceholder {
-                background: rgba(8, 8, 8, 160);
-                border: 1px dashed rgba(145, 184, 122, 100);
-                border-radius: 3px;
-            }
+            QLabel#poeNinjaTrendLabel { color: #91b87a; font-size: 10px; }
+            QPushButton#poeNinjaOpenButton { padding: 3px 7px; }
             QLabel#itemName {
                 color: #d8ffbd;
                 font-size: 15px;
@@ -1143,6 +1187,10 @@ class PoetoreWindow(QWidget):
         self._app_config.setdefault("poetore", {})["league"] = value
         if self._save_app_config is not None:
             self._save_app_config(self._app_config)
+        item = getattr(self, "_parsed_item", None)
+        if item is not None:
+            self._poe_ninja_item_key = None
+            self._queue_poe_ninja_price(item)
 
     def _league_selection_value(self) -> str:
         index = self.trade_league_combo.currentIndex()
@@ -1153,10 +1201,68 @@ class PoetoreWindow(QWidget):
                 return str(selected)
         return text
 
+    def _queue_poe_ninja_price(self, item):
+        league = self._selected_trade_league()
+        key = (
+            item.raw_text, league, str(self._trade_item_name or ""),
+            str(self._trade_base_type or ""),
+        )
+        if key == self._poe_ninja_item_key:
+            return
+        self._poe_ninja_item_key = key
+        self._hide_poe_ninja_price(key)
+        if not league:
+            return
+
+        def run():
+            try:
+                result = default_poe_ninja_service.lookup(
+                    item, league,
+                    trade_name=self._trade_item_name,
+                    trade_base_type=self._trade_base_type,
+                )
+            except Exception:
+                self._trade_signals.poe_ninja_failed.emit(key)
+            else:
+                if result is None:
+                    self._trade_signals.poe_ninja_failed.emit(key)
+                else:
+                    self._trade_signals.poe_ninja_ready.emit(key, result)
+
+        threading.Thread(target=run, daemon=True).start()
+
+    def _show_poe_ninja_price(self, key, price: PoeNinjaPrice):
+        if key != self._poe_ninja_item_key:
+            return
+        self.poe_ninja_price_value.setText(price.display_price())
+        trend = price.trend_summary()
+        self.poe_ninja_trend_label.setText(
+            f"{trend[0]} {trend[1]}\n7日推移" if trend else "7日データなし"
+        )
+        self.poe_ninja_trend_chart.setPoints(price.graph_points())
+        self._last_poe_ninja_url = price.url
+        self.poe_ninja_price_panel.show()
+
+    def _hide_poe_ninja_price(self, key=None):
+        if key is not None and key != self._poe_ninja_item_key:
+            return
+        self.poe_ninja_price_panel.hide()
+        self.poe_ninja_price_value.setText("—")
+        self.poe_ninja_trend_label.clear()
+        self.poe_ninja_trend_chart.setPoints(())
+        self._last_poe_ninja_url = ""
+
+    def _open_poe_ninja_url(self):
+        if self._last_poe_ninja_url:
+            QDesktopServices.openUrl(QUrl(self._last_poe_ninja_url))
+
     def showEvent(self, event):
         if not self._focus_signal_connected:
             QApplication.instance().focusChanged.connect(self._close_when_focus_leaves_panel)
             self._focus_signal_connected = True
+        item = getattr(self, "_parsed_item", None)
+        if item is not None:
+            self._queue_poe_ninja_price(item)
         super().showEvent(event)
 
     def closeEvent(self, event):
@@ -1267,6 +1373,8 @@ class PoetoreWindow(QWidget):
         else:
             self.mod_warning.clear()
             self.mod_warning.hide()
+        if self.isVisible():
+            self._queue_poe_ninja_price(item)
 
     def search_current_item(self):
         self.parse_current_text()

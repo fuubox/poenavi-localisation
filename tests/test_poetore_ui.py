@@ -11,6 +11,7 @@ from src.poetore.window_position import PlacementContext
 from src.poetore.trade import PriceListing, PriceResult, TradeLeague, TradeStatFilter
 from src.poetore.parser import parse_item_text
 from src.poetore.models import ItemModifier, ParsedItem
+from src.poetore.poe_ninja import PoeNinjaPrice
 from src.ui.settings_dialog import SettingsDialog
 
 
@@ -870,6 +871,28 @@ def test_poe_ninja_placeholder_sits_between_header_and_filter_chips(qapp):
         assert window.poe_ninja_price_panel.isHidden()
         assert window.poe_ninja_price_value.text() == "—"
         assert window.poe_ninja_trend_placeholder.size() == QSize(116, 24)
+    finally:
+        window.close()
+
+
+def test_poe_ninja_price_panel_renders_price_trend_and_link(qapp):
+    window = PoetoreWindow()
+    try:
+        key = ("item", "Standard", "Mageblood", "Heavy Belt")
+        window._poe_ninja_item_key = key
+        price = PoeNinjaPrice(
+            "Mageblood", "Heavy Belt", 40000, (0, 1, 2, 3, 4, 5, 6),
+            "https://poe.ninja/example", 200,
+        )
+        window._show_poe_ninja_price(key, price)
+        assert not window.poe_ninja_price_panel.isHidden()
+        assert window.poe_ninja_price_value.text() == "200 div"
+        assert "7日推移" in window.poe_ninja_trend_label.text()
+        assert window.poe_ninja_trend_chart._points == (0, 1, 2, 3, 4, 5, 6)
+        assert window._last_poe_ninja_url == "https://poe.ninja/example"
+
+        window._hide_poe_ninja_price(key)
+        assert window.poe_ninja_price_panel.isHidden()
     finally:
         window.close()
 

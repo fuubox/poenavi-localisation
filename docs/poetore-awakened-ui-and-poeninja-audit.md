@@ -210,7 +210,11 @@ Awakenedの取得制御:
 
 - Unique、Gem、Map／Blighted Map
 - Currency／Fragment／Divination Card等の名前一致品
-- 価値ある非ユニーク武器・防具・装飾品ベース
+
+ぽえとれでの対象外:
+
+- 非ユニーク武器・防具・装飾品のBaseType価格は参考価値が低いため表示しない
+- Cluster Jewelは集計自体に価値があるが、日本語コピーから`Enchant効果＋パッシブ数＋ilvl帯`への高信頼度照合が未完成のため初版では表示しない
 
 後回し:
 
