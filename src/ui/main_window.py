@@ -1182,7 +1182,7 @@ class RouteSelectionDialog(QDialog):
 
         layout = QVBoxLayout(self)
         layout.setSpacing(12)
-        
+
         desc = QLabel("攻略ルートを選択してください。後から設定画面で変更できます。")
         desc.setStyleSheet(f"color: {Styles.TEXT_COLOR}; font-size: 13px;")
         desc.setWordWrap(True)
@@ -6855,26 +6855,36 @@ class MainWindow(QMainWindow):
         self.move(x, y)
 
     def closeEvent(self, event):
-        # ウィンドウ位置・サイズを保存
-        # 他のウィンドウが終了直前に保存した設定（例: map_viewer_width/height）を
-        # 古い self.config で上書きしないよう、最新configを読み直して必要キーだけ更新する。
-        geo = self.geometry()
-        config = ConfigManager.load_config()
-        config["window_geometry"] = {
-            "x": geo.x(),
-            "y": geo.y(),
-            "width": geo.width(),
-            "height": geo.height(),
-        }
-        ConfigManager.save_config(config)
-        self.config = config
+        # 起動時アップデートでは、保存済みジオメトリを復元する前の仮サイズ
+        # (420x1200) のまま終了する。初期化・初期配置が完了した通常終了時だけ
+        # 位置とサイズを保存し、ユーザー設定を仮サイズで上書きしない。
+        if (
+            getattr(self, "_main_window_initialized", False)
+            and getattr(self, "_initial_positioned", False)
+        ):
+            # 他のウィンドウが終了直前に保存した設定（例: map_viewer_width/height）を
+            # 古い self.config で上書きしないよう、最新configを読み直して必要キーだけ更新する。
+            geo = self.geometry()
+            config = ConfigManager.load_config()
+            config["window_geometry"] = {
+                "x": geo.x(),
+                "y": geo.y(),
+                "width": geo.width(),
+                "height": geo.height(),
+            }
+            ConfigManager.save_config(config)
+            self.config = config
 
         # みになびは本体と独立したトップレベルウィンドウなので、アプリ終了時は
         # 明示的に一緒に閉じる。
-        if hasattr(self, "mini_navi_overlay"):
-            self.mini_navi_overlay.close()
-        
-        if self.keyboard_listener:
-            self.keyboard_listener.stop()
-        self.log_watcher.stop()
+        overlay = getattr(self, "mini_navi_overlay", None)
+        if overlay is not None:
+            overlay.close()
+
+        keyboard_listener = getattr(self, "keyboard_listener", None)
+        if keyboard_listener:
+            keyboard_listener.stop()
+        log_watcher = getattr(self, "log_watcher", None)
+        if log_watcher is not None:
+            log_watcher.stop()
         super().closeEvent(event)
