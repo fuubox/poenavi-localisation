@@ -1052,6 +1052,9 @@ Elder Item
 
         assert not window.influence_chips["shaper"].isHidden()
         assert not window.influence_chips["elder"].isHidden()
+        assert not window.influence_chips["shaper"].icon().isNull()
+        assert window.influence_chips["shaper"].iconSize().width() == 20
+        assert not window.influence_chips["elder"].icon().isNull()
         assert window._selected_influence_filters() == ()
 
         window.trade_preset_combo.setCurrentIndex(1)

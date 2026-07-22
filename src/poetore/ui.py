@@ -3,9 +3,10 @@ from __future__ import annotations
 import threading
 import re
 from dataclasses import replace
+from pathlib import Path
 
-from PySide6.QtCore import QEvent, QObject, QPoint, Qt, QTimer, Signal, QUrl
-from PySide6.QtGui import QDesktopServices, QIntValidator
+from PySide6.QtCore import QEvent, QObject, QPoint, QSize, Qt, QTimer, Signal, QUrl
+from PySide6.QtGui import QDesktopServices, QIcon, QIntValidator
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QApplication, QComboBox, QFrame, QHBoxLayout, QLabel, QLineEdit, QMessageBox, QPushButton,
@@ -481,6 +482,10 @@ class PoetoreWindow(QWidget):
         for influence, (label, _stat_id) in _INFLUENCE_CHIPS.items():
             button = QPushButton(f"☐ {label}")
             button.setObjectName("influenceChip")
+            icon_path = Path(__file__).resolve().parents[2] / "assets" / "icons" / f"{label}.png"
+            if icon_path.is_file():
+                button.setIcon(QIcon(str(icon_path)))
+                button.setIconSize(QSize(20, 20))
             button.clicked.connect(
                 lambda checked=False, value=influence: self._toggle_influence_filter(value)
             )
