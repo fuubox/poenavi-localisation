@@ -148,6 +148,8 @@ def test_poetore_title_bar_keeps_close_button(qapp):
     try:
         assert window.trade_league_combo.parentWidget().objectName() == "poetoreTitleBar"
         assert window.trade_league_combo.width() == 290
+        assert window.league_popup_button.text() == "▼"
+        assert window.league_popup_button.toolTip() == "リーグ一覧を開く"
         close_buttons = [
             button for button in window.findChildren(QPushButton)
             if button.toolTip() == "閉じる" and button.text() == "×"

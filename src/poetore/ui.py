@@ -367,6 +367,12 @@ class _PoetoreTitleBar(QWidget):
         layout.addWidget(title)
         layout.addStretch()
         layout.addWidget(window.trade_league_combo)
+        window.league_popup_button = QPushButton("▼")
+        window.league_popup_button.setObjectName("leaguePopupButton")
+        window.league_popup_button.setToolTip("リーグ一覧を開く")
+        window.league_popup_button.setFixedSize(28, 28)
+        window.league_popup_button.clicked.connect(window.trade_league_combo.showPopup)
+        layout.addWidget(window.league_popup_button)
         layout.addStretch()
         close_button = QPushButton("×")
         close_button.setToolTip("閉じる")
@@ -824,6 +830,12 @@ class PoetoreWindow(QWidget):
             QLabel#poeNinjaPriceValue { color: #f4ffed; font-size: 14px; font-weight: 700; }
             QLabel#poeNinjaTrendLabel { color: #91b87a; font-size: 10px; }
             QPushButton#poeNinjaOpenButton { padding: 3px 7px; }
+            QPushButton#leaguePopupButton {
+                color: #d8ffbd;
+                padding: 0;
+                font-size: 11px;
+                border-color: rgba(176, 255, 123, 150);
+            }
             QLabel#itemName {
                 color: #d8ffbd;
                 font-size: 15px;
