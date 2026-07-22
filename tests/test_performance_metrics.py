@@ -4,6 +4,7 @@ import unittest
 from contextlib import redirect_stdout
 from unittest.mock import patch
 
+from src.ui.main_window import MainWindow
 from src.utils.performance_metrics import measure
 
 
@@ -26,3 +27,13 @@ class PerformanceMetricsTest(unittest.TestCase):
             pass
 
         self.assertEqual(output.getvalue(), "")
+
+    @patch("src.ui.main_window.measure")
+    def test_zone_entry_is_measured(self, measure_mock):
+        window = MainWindow.__new__(MainWindow)
+
+        with patch.object(MainWindow, "_handle_zone_entered") as handle_zone_entered:
+            MainWindow.on_zone_entered(window, "The Coast")
+
+        measure_mock.assert_called_once_with("zone update")
+        handle_zone_entered.assert_called_once_with("The Coast", True)

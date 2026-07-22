@@ -18,6 +18,7 @@ from src.utils.lap_recorder import LapRecorder
 from src.utils.segment_recorder import SegmentRecorder
 from src.utils.log_watcher import LogWatcher
 from src.utils.log_path_detector import fill_missing_client_log_paths
+from src.utils.performance_metrics import measure
 from src.utils.window_focus import get_foreground_window, focus_window, get_next_visible_window_after
 from src.utils.zone_lookup import get_zone_info, get_level_advice
 from src.utils.guide_data import load_guide_data, get_zone_guide, get_zone_guide_level, format_guide_html, get_mini_navi_content
@@ -3468,11 +3469,12 @@ class MainWindow(QMainWindow):
         self._current_zone_name = ""
         self._current_area_note = ""
         self._current_poelab_type = None
-        zone_master_data = load_zone_master_data()
-        self.zone_data_by_version = zone_master_data["zone_data_by_version"]
-        self.town_zones_by_version = zone_master_data["town_zones_by_version"]
-        self.zone_data = self.zone_data_by_version.get(self.poe_version, {})
-        self.guide_data = load_guide_data(self.poe_version)
+        with measure("startup data load"):
+            zone_master_data = load_zone_master_data()
+            self.zone_data_by_version = zone_master_data["zone_data_by_version"]
+            self.town_zones_by_version = zone_master_data["town_zones_by_version"]
+            self.zone_data = self.zone_data_by_version.get(self.poe_version, {})
+            self.guide_data = load_guide_data(self.poe_version)
         self.mini_navi_overlay = MiniNaviOverlay(self)
         self.poelab_url_resolved.connect(self._open_resolved_poelab_url)
         self.poelab_url_failed.connect(self._handle_poelab_url_error)
@@ -6094,6 +6096,10 @@ class MainWindow(QMainWindow):
             self.gem_tracker_popup.gem_tracker.set_current_act(act)
 
     def on_zone_entered(self, zone_name: str, actual_entry: bool = True):
+        with measure("zone update"):
+            return self._handle_zone_entered(zone_name, actual_entry)
+
+    def _handle_zone_entered(self, zone_name: str, actual_entry: bool = True):
         """エリア入場検知
 
         actual_entry=False はレベルアップ等による現在エリア表示の再評価用。
