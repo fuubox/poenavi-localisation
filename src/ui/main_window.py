@@ -151,11 +151,11 @@ class MiniNaviOverlay(QWidget):
         "fade_delay_ms": 5000,
         "window_opacity": 100,
         "text_opacity": 100,
-        "font_size": 15,
+        "font_size": 18,
         "max_lines": 3,
         "position": {"x": 80, "y": 160},
-        "width": 360,
-        "height": 100,
+        "width": 800,
+        "height": 130,
         "show_lock_button": True,
         "always_on_top": True,
     }
@@ -262,11 +262,11 @@ class MiniNaviOverlay(QWidget):
         cfg = self.config()
         if refresh_window_flags:
             self._apply_window_flags()
-        self.resize(int(cfg.get("width", 360)), int(cfg.get("height", 100)))
+        self.resize(int(cfg.get("width", 800)), int(cfg.get("height", 130)))
         pos = cfg.get("position", {}) if isinstance(cfg.get("position"), dict) else {}
         self.move(int(pos.get("x", 80)), int(pos.get("y", 160)))
         self._show_strong_opacity(restart_fade=False)
-        font_size = int(cfg.get("font_size", 15))
+        font_size = int(cfg.get("font_size", 18))
         window_opacity_pct = max(5, min(int(cfg.get("window_opacity", 100)), 100))
         bg_alpha = int(window_opacity_pct / 100.0 * 255)
         border_alpha = int(window_opacity_pct / 100.0 * 140)

@@ -14,7 +14,7 @@ class ConfigManager:
     DEFAULT_CONFIG_FILE = "default_config.json"
     APP_NAME = "PoENavi"
     ENV_USER_DATA_DIR = "POENAVI_USER_DATA_DIR"
-    CURRENT_SCHEMA_VERSION = 1
+    CURRENT_SCHEMA_VERSION = 2
     POE1_ROUTE_ACT3_DEFAULT = "library_detour"
     POE1_ROUTE_ACT8_DEFAULT = "standard"
     POE1_ROUTE_ACT3_OLD_DEFAULT = "library_detour"
@@ -381,6 +381,15 @@ class ConfigManager:
 
         if schema_version < 1:
             migrated["schemaVersion"] = 1
+
+        if schema_version < 2:
+            mini_navi = migrated.get("mini_guide_overlay")
+            if isinstance(mini_navi, dict):
+                if mini_navi.get("width") == 360 and mini_navi.get("height") == 100:
+                    mini_navi["width"] = 800
+                    mini_navi["height"] = 130
+                if mini_navi.get("font_size") == 16:
+                    mini_navi["font_size"] = 18
 
         if "poe1_route_selected" not in migrated:
             migrated["poe1_route_selected"] = cls._infer_poe1_route_selected(config)
