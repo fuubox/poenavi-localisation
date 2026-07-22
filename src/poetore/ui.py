@@ -264,6 +264,10 @@ class _CycleButton(QPushButton):
     def _sync_state(self):
         label, _, alert = self._options[self._current_index]
         self.setText(label)
+        # チェック表示を持たない状態チップも、現在選択中の検索方針として
+        # 常に有効色で表示する。状態によってAPI条件が未指定になる場合でも、
+        # UI上ではユーザーが選んだ方針であることを明確にする。
+        self.setProperty("active", True)
         self.setProperty("alert", alert)
         self.style().unpolish(self)
         self.style().polish(self)
@@ -771,7 +775,7 @@ class PoetoreWindow(QWidget):
         debug_layout.addWidget(self.result_tree)
         panel_layout.addWidget(self._debug_parse_area)
         self.mod_filter_tree = QTreeWidget()
-        self.mod_filter_tree.setHeaderLabels(["", "種別", "検索条件", "最小", "最大", "詳細", "論理"])
+        self.mod_filter_tree.setHeaderLabels(["", "種別", "検索条件", "最小", "最大", "詳細"])
         self.mod_filter_tree.setRootIsDecorated(False)
         self.mod_filter_tree.setAlternatingRowColors(True)
         self.mod_filter_tree.setMinimumHeight(230)
@@ -782,7 +786,6 @@ class PoetoreWindow(QWidget):
         mod_header.setSectionResizeMode(3, QHeaderView.ResizeToContents)
         mod_header.setSectionResizeMode(4, QHeaderView.ResizeToContents)
         mod_header.setSectionResizeMode(5, QHeaderView.Stretch)
-        mod_header.setSectionResizeMode(6, QHeaderView.ResizeToContents)
         panel_layout.addWidget(self.mod_filter_tree, stretch=3)
         self.mod_warning = QLabel("")
         self.mod_warning.setWordWrap(True)
@@ -915,8 +918,9 @@ class PoetoreWindow(QWidget):
                 font-weight: 700;
             }
             QPushButton#cycleToggle {
-                background: rgba(26, 26, 26, 225);
+                background: rgba(70, 105, 52, 210);
                 color: #f4ffed;
+                border: 1px solid #b0ff7b;
                 min-width: 112px;
                 font-weight: 700;
             }
@@ -2035,7 +2039,6 @@ class PoetoreWindow(QWidget):
             row = self.mod_filter_tree.topLevelItem(index)
             editor = self.mod_filter_tree.itemWidget(row, 3)
             max_editor = self.mod_filter_tree.itemWidget(row, 4)
-            logic_editor = self.mod_filter_tree.itemWidget(row, 6)
             value_text = editor.text().strip() if isinstance(editor, QLineEdit) else row.text(3).strip()
             max_text = max_editor.text().strip() if isinstance(max_editor, QLineEdit) else row.text(4).strip()
             try:
@@ -2051,8 +2054,6 @@ class PoetoreWindow(QWidget):
                 filters.append(replace(
                     original, min_value=value, max_value=maximum,
                     enabled=row.checkState(0) == Qt.Checked,
-                    group_type=(logic_editor.currentData()
-                                if isinstance(logic_editor, QComboBox) else original.group_type),
                 ))
             else:
                 filters.append(TradeStatFilter(
@@ -2124,7 +2125,7 @@ class PoetoreWindow(QWidget):
                 confidence = ""
             summary = " / ".join(filter(None, [stat_filter.selection_reason, *details, confidence]))
             row = QTreeWidgetItem([
-                "", _filter_kind_label(stat_filter), stat_filter.text, "", "", summary, "",
+                "", _filter_kind_label(stat_filter), stat_filter.text, "", "", summary,
             ])
             row.setData(0, Qt.UserRole, stat_filter.stat_id)
             row.setData(0, Qt.UserRole + 1, stat_filter.ref)
@@ -2148,12 +2149,6 @@ class PoetoreWindow(QWidget):
             max_editor.setFixedWidth(80)
             max_editor.setEnabled(stat_filter.option_value is None)
             self.mod_filter_tree.setItemWidget(row, 4, max_editor)
-            logic = QComboBox()
-            logic.installEventFilter(self)
-            for label, value_name in (("AND", "and"), ("NOT", "not"), ("COUNT", "count")):
-                logic.addItem(label, value_name)
-            logic.setCurrentIndex(max(0, logic.findData(stat_filter.group_type)))
-            self.mod_filter_tree.setItemWidget(row, 6, logic)
 
     def _search_completed(self, result: PriceResult, initial_filters):
         if initial_filters:

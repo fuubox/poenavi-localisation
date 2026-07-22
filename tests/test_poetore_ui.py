@@ -205,6 +205,12 @@ def test_poetore_uses_wide_poena_theme_and_hides_debug_parse_area(qapp):
         assert window._panel.objectName() == "poetorePanel"
         assert not window._debug_parse_area.isVisible()
         assert window.mod_filter_tree.isColumnHidden(5)
+        assert window.mod_filter_tree.columnCount() == 6
+        assert window.mod_filter_tree.headerItem().text(5) == "詳細"
+        assert "論理" not in [
+            window.mod_filter_tree.headerItem().text(index)
+            for index in range(window.mod_filter_tree.columnCount())
+        ]
         assert "rgba(14, 14, 14, 246)" in window.styleSheet()
         assert "#b0ff7b" in window.styleSheet()
     finally:
@@ -366,6 +372,31 @@ def test_mod_filters_are_checkable_and_minimum_is_editable(qapp):
     window.close()
 
 
+@pytest.mark.parametrize(("group_type", "group_key", "group_min"), [
+    ("and", None, None),
+    ("not", "valdo-lethal", None),
+    ("count", "either", 1),
+])
+def test_mod_filter_ui_preserves_internal_logic_without_user_logic_column(
+    qapp, group_type, group_key, group_min,
+):
+    window = PoetoreWindow()
+    try:
+        source = TradeStatFilter(
+            "explicit.stat_1", "内部論理Mod", 10, "explicit", True,
+            group_type=group_type, group_key=group_key, group_min=group_min,
+        )
+        window._populate_stat_filters((source,))
+        row = window.mod_filter_tree.topLevelItem(0)
+        assert window.mod_filter_tree.itemWidget(row, 6) is None
+        selected = window._selected_stat_filters()[0]
+        assert selected.group_type == group_type
+        assert selected.group_key == group_key
+        assert selected.group_min == group_min
+    finally:
+        window.close()
+
+
 def test_mod_filter_ui_shows_reason_tier_range_generation_and_matching(qapp):
     window = PoetoreWindow()
     try:
@@ -477,11 +508,13 @@ def test_split_filter_is_an_awakened_style_cycle_button(qapp):
     window = PoetoreWindow()
     try:
         toggle = window.split_combo
+        assert toggle.property("active") is True
         assert toggle.currentText() == "スプリット"
         assert toggle.currentData() is True
         toggle.click()
         assert toggle.currentText() == "非スプリット"
         assert toggle.currentData() is False
+        assert toggle.property("active") is True
         toggle.click()
         assert toggle.currentText() == "スプリット"
     finally:
