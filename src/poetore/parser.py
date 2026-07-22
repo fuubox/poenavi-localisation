@@ -168,6 +168,18 @@ def _category_with_help_text(item_class: str, text: str) -> str:
     return category
 
 
+def _category_with_item_identity(
+    item_class: str, name: str, base_type: str, text: str,
+) -> str:
+    category = _category_with_help_text(item_class, text)
+    identity = f"{name}\n{base_type}".casefold()
+    if category == "jewel" and (
+        "cluster jewel" in identity or "クラスタージュエル" in identity
+    ):
+        return "cluster_jewel"
+    return category
+
+
 def _numbers(text: str) -> tuple[float, ...]:
     values = []
     for match in _NUMBER.findall(text.replace(",", "")):
@@ -282,7 +294,9 @@ def parse_item_text(text: str) -> ParsedItem:
     current_header_affix: str | None = None
     current_header_generation: str | None = None
     current_modifier_group = 0
-    item_category = _category_with_help_text(header.get("item_class", ""), text)
+    item_category = _category_with_item_identity(
+        header.get("item_class", ""), name, base_type, text,
+    )
     for section_index, section in enumerate(sections[1:], start=1):
         # 装備性能・装備条件など、item levelより前の区画は検索Modではない。
         metadata_section = not reached_item_level

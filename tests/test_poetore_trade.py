@@ -663,6 +663,29 @@ Item Level: 72
     assert query["filters"]["misc_filters"]["filters"]["ilvl"] == {"min": 68.0, "max": 74.0}
 
 
+@pytest.mark.parametrize(("base_type", "english_base"), [
+    ("クラスタージュエル (大)", "Large Cluster Jewel"),
+    ("クラスタージュエル (中)", "Medium Cluster Jewel"),
+    ("クラスタージュエル (小)", "Small Cluster Jewel"),
+])
+def test_japanese_cluster_jewel_class_keeps_exact_cluster_base(
+    base_type, english_base,
+):
+    item = parse_item_text(f"""アイテムクラス: ジュエル
+レアリティ: レア
+試験品
+{base_type}
+--------
+アイテムレベル: 84
+""")
+    assert item.category == "cluster_jewel"
+    query = build_search_query(item, english_base)["query"]
+    assert query["type"] == english_base
+    assert query.get("filters", {}).get("type_filters", {}).get(
+        "filters", {}
+    ).get("category") is None
+
+
 def test_magic_jewel_search_requires_magic_rarity_and_exact_corruption_state():
     item = parse_item_text("""Item Class: Jewels
 Rarity: Magic
