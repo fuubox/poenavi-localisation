@@ -826,7 +826,10 @@ class PoetoreWindow(QWidget):
         listed_within_label = self.listed_within_combo.currentText()
         preset = str(self.trade_preset_combo.currentData() or PRESET_FINISHED)
         preset_label = self.trade_preset_combo.currentText()
-        include_corrupted = self.corrupted_combo.currentData()
+        include_corrupted = (
+            self.corrupted_combo.currentData()
+            if not self.corrupted_combo.isHidden() else None
+        )
         include_split = bool(self.split_combo.currentData())
         magic_exact = bool(
             self.magic_rarity_toggle.isVisible() and self.magic_rarity_toggle.currentData()
@@ -946,12 +949,18 @@ class PoetoreWindow(QWidget):
         self._state_item_key = key
         self.corrupted_combo.setCurrentIndex(0 if "corrupted" in item.flags else 1)
         self.split_combo.setCurrentIndex(1 if "split" in item.flags else 0)
-        is_equipment = item.category in {
+        supports_corruption_filter = item.category in {
+            "weapon", "armour", "accessory", "cluster_jewel", "jewel", "abyss_jewel",
+            "gem", "map", "flask", "tincture", "heist_equipment", "sanctum_relic",
+            "charm", "idol",
+        }
+        self.corrupted_combo.setVisible(supports_corruption_filter)
+        self.corrupted_combo.setEnabled(supports_corruption_filter)
+        supports_split_filter = item.category in {
             "weapon", "armour", "accessory", "cluster_jewel", "jewel", "abyss_jewel",
             "gem",
         }
-        self.corrupted_combo.setEnabled(is_equipment)
-        self.split_combo.setEnabled(is_equipment)
+        self.split_combo.setEnabled(supports_split_filter)
 
     def _trade_preset_changed(self):
         if not hasattr(self, "mod_filter_tree"):

@@ -713,6 +713,28 @@ def test_search_rejects_unknown_corruption_mode():
         build_search_query(item, include_corrupted="invalid")
 
 
+@pytest.mark.parametrize("category", [
+    "map", "flask", "tincture", "heist_equipment", "sanctum_relic", "charm", "idol",
+])
+def test_special_category_explicit_corruption_filter_reaches_trade_query(category):
+    item = ParsedItem(
+        item_class="Test Items", rarity="Rare", name="Test Item",
+        base_type="Test Item", category=category, raw_text=f"special:{category}",
+    )
+    corrupted = build_search_query(item, include_corrupted="only")["query"]
+    uncorrupted = build_search_query(item, include_corrupted=False)["query"]
+    both = build_search_query(item, include_corrupted=True)["query"]
+    assert corrupted["filters"]["misc_filters"]["filters"]["corrupted"] == {
+        "option": "true"
+    }
+    assert uncorrupted["filters"]["misc_filters"]["filters"]["corrupted"] == {
+        "option": "false"
+    }
+    assert "corrupted" not in both.get("filters", {}).get(
+        "misc_filters", {}
+    ).get("filters", {})
+
+
 def test_split_uncorrupted_item_defaults_to_uncorrupted_and_includes_split():
     item = parse_item_text(ITEM + "--------\nSplit\n")
     misc = build_search_query(item)["query"]["filters"]["misc_filters"]["filters"]

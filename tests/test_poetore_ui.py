@@ -621,6 +621,41 @@ Supports attack skills.
         window.close()
 
 
+@pytest.mark.parametrize("category", [
+    "map", "flask", "tincture", "heist_equipment", "sanctum_relic", "charm", "idol",
+])
+def test_requested_special_categories_show_corruption_filter(qapp, category):
+    window = PoetoreWindow()
+    try:
+        item = ParsedItem(
+            item_class="Test Items", rarity="Rare", name="Test Item",
+            base_type="Test Item", category=category, raw_text=f"special:{category}",
+        )
+        window._configure_item_state_filters(item)
+        assert not window.corrupted_combo.isHidden()
+        assert window.corrupted_combo.isEnabled()
+    finally:
+        window.close()
+
+
+@pytest.mark.parametrize("category", [
+    "invitation", "heist_contract", "heist_blueprint", "memory_line",
+    "expedition_logbook", "incursion_item", "graft", "captured_beast",
+    "currency", "divination_card", "unknown",
+])
+def test_unsupported_categories_hide_corruption_filter(qapp, category):
+    window = PoetoreWindow()
+    try:
+        item = ParsedItem(
+            item_class="Test Items", rarity="Rare", name="Test Item",
+            base_type="Test Item", category=category, raw_text=f"unsupported:{category}",
+        )
+        window._configure_item_state_filters(item)
+        assert window.corrupted_combo.isHidden()
+    finally:
+        window.close()
+
+
 def test_header_shows_scope_toggle_for_nonunique_weapon_armour_and_accessory(qapp):
     window = PoetoreWindow()
     try:

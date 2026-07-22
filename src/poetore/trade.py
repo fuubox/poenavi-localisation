@@ -1793,6 +1793,11 @@ def build_search_query(
             misc["corrupted"] = {
                 "option": "true" if "corrupted" in item.flags else "false"
             }
+    if corruption_mode_explicit and include_corrupted != True:
+        misc = query["filters"].setdefault("misc_filters", {"filters": {}})["filters"]
+        misc["corrupted"] = {
+            "option": "true" if include_corrupted == "only" else "false"
+        }
     stat_groups: dict[tuple[str, str], dict] = {("and", ""): query["stats"][0]}
     for stat_filter in stat_filters:
         if not stat_filter.enabled:
