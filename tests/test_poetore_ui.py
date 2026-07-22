@@ -607,6 +607,35 @@ Item Level: 86
         window.close()
 
 
+@pytest.mark.parametrize(("item_level", "minimum", "maximum"), [
+    (49, "1", "49"),
+    (50, "50", "67"),
+    (72, "68", "74"),
+    (80, "75", ""),
+    (84, "84", ""),
+])
+def test_cluster_item_level_tag_uses_awakened_bracket(qapp, item_level, minimum, maximum):
+    window = PoetoreWindow()
+    try:
+        item = parse_item_text(f"""Item Class: Cluster Jewels
+Rarity: Rare
+Test Cluster
+Large Cluster Jewel
+--------
+Item Level: {item_level}
+""")
+        window._configure_item_level(item)
+
+        assert window.item_level_edit.text() == minimum
+        assert not window.item_level_max_edit.isHidden()
+        assert window.item_level_max_edit.text() == maximum
+        assert window._selected_item_level_range() == (
+            int(minimum), int(maximum) if maximum else None,
+        )
+    finally:
+        window.close()
+
+
 def test_corrupted_item_defaults_to_corrupted_only(qapp):
     window = PoetoreWindow()
     try:

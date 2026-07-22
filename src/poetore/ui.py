@@ -326,6 +326,17 @@ class PoetoreWindow(QWidget):
         self.item_level_edit.setFixedWidth(34)
         self.item_level_edit.setToolTip("検索対象の最小アイテムレベル（1～100）")
         item_level_layout.addWidget(self.item_level_edit)
+        self.item_level_range_separator = QLabel("～")
+        self.item_level_range_separator.hide()
+        item_level_layout.addWidget(self.item_level_range_separator)
+        self.item_level_max_edit = QLineEdit()
+        self.item_level_max_edit.setObjectName("itemLevelMaxEdit")
+        self.item_level_max_edit.setValidator(QIntValidator(1, 100, self.item_level_max_edit))
+        self.item_level_max_edit.setAlignment(Qt.AlignCenter)
+        self.item_level_max_edit.setFixedWidth(34)
+        self.item_level_max_edit.setToolTip("検索対象の最大アイテムレベル（1～100）")
+        self.item_level_max_edit.hide()
+        item_level_layout.addWidget(self.item_level_max_edit)
         self.item_level_tag.hide()
         item_state_options.addWidget(self.item_level_tag)
         self.split_combo = _BinaryToggle(
@@ -878,7 +889,7 @@ class PoetoreWindow(QWidget):
             if not self.corrupted_combo.isHidden() else None
         )
         include_split = bool(self.split_combo.currentData())
-        item_level_min = self._selected_item_level()
+        item_level_min, item_level_max = self._selected_item_level_range()
         magic_exact = bool(
             self.magic_rarity_toggle.isVisible() and self.magic_rarity_toggle.currentData()
         )
@@ -929,6 +940,7 @@ class PoetoreWindow(QWidget):
                     magic_exact=magic_exact,
                     exact_base_type=self._searches_exact_base_type(item),
                     item_level_min=item_level_min,
+                    item_level_max=item_level_max,
                 )
             except (TradeApiError, ValueError) as exc:
                 self._trade_signals.failed.emit(str(exc))
@@ -1016,13 +1028,31 @@ class PoetoreWindow(QWidget):
         self._item_level_item_key = key
         has_item_level = item.item_level is not None
         self.item_level_tag.setVisible(has_item_level)
-        self.item_level_edit.setText(str(item.item_level) if has_item_level else "")
+        is_cluster = has_item_level and item.category == "cluster_jewel"
+        self.item_level_range_separator.setVisible(is_cluster)
+        self.item_level_max_edit.setVisible(is_cluster)
+        self.item_level_tag.setFixedWidth(145 if is_cluster else 92)
+        if is_cluster:
+            minimum = max(value for value in (1, 50, 68, 75, 84) if value <= item.item_level)
+            maximum = next((value for value in (49, 67, 74) if value >= item.item_level), None)
+            self.item_level_edit.setText(str(minimum))
+            self.item_level_max_edit.setText(str(maximum) if maximum is not None else "")
+        else:
+            self.item_level_edit.setText(str(item.item_level) if has_item_level else "")
+            self.item_level_max_edit.clear()
 
     def _selected_item_level(self) -> int | None:
+        return self._selected_item_level_range()[0]
+
+    def _selected_item_level_range(self) -> tuple[int | None, int | None]:
         if self.item_level_tag.isHidden():
-            return None
-        text = self.item_level_edit.text().strip()
-        return int(text) if text else None
+            return None, None
+        minimum_text = self.item_level_edit.text().strip()
+        maximum_text = self.item_level_max_edit.text().strip() if not self.item_level_max_edit.isHidden() else ""
+        return (
+            int(minimum_text) if minimum_text else None,
+            int(maximum_text) if maximum_text else None,
+        )
 
     def _trade_preset_changed(self):
         if not hasattr(self, "mod_filter_tree"):

@@ -767,11 +767,31 @@ def test_common_item_level_override_replaces_category_specific_range():
     assert query["filters"]["misc_filters"]["filters"]["ilvl"] == {"min": 82}
 
 
+def test_common_item_level_range_override_replaces_category_specific_range():
+    item = parse_item_text(ITEM)
+    bracket = TradeStatFilter(
+        "property.item_level", "アイテムレベル帯", 84.0, "base", True,
+        max_value=100.0,
+    )
+    query = build_search_query(
+        item, stat_filters=(bracket,), item_level_min=68, item_level_max=74,
+    )["query"]
+    assert query["filters"]["misc_filters"]["filters"]["ilvl"] == {
+        "min": 68, "max": 74,
+    }
+
+
 @pytest.mark.parametrize("value", [0, 101])
 def test_common_item_level_override_rejects_out_of_range_values(value):
     item = parse_item_text(ITEM)
     with pytest.raises(ValueError, match="1～100"):
         build_search_query(item, item_level_min=value)
+
+
+def test_common_item_level_override_rejects_reversed_range():
+    item = parse_item_text(ITEM)
+    with pytest.raises(ValueError, match="最小値は最大値以下"):
+        build_search_query(item, item_level_min=84, item_level_max=83)
 
 
 def test_search_rejects_unknown_corruption_mode():
