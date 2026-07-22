@@ -12,12 +12,13 @@
 ## 再開時の推奨順
 
 1. **高優先度: 未鑑定ユニークの画像付き候補カード**
-2. 防具・盾のカテゴリ専用UI
-3. アクセサリー → Jewel系 → Gem → Flask／Map／Heist等の専用UI
-4. カテゴリ切替時の状態残りとプリセット表示規則を横断確認
-5. Windows実機・高DPI確認
-6. pseudoデータ保守性
-7. README・配布ビルド・公開準備
+2. **高優先度: Inscribed Ultimatumの詳細検索**
+3. 防具・盾のカテゴリ専用UI
+4. アクセサリー → Jewel系 → Gem → Flask／Map／Heist等の専用UI
+5. カテゴリ切替時の状態残りとプリセット表示規則を横断確認
+6. Windows実機・高DPI確認
+7. pseudoデータ保守性
+8. README・配布ビルド・公開準備
 
 共通UI、検索チップ、Trade結果表、poe.ninja参考価格欄は初版が完成しているため、
 次回は共通部分を作り直さずカテゴリ専用UIへ進む。
@@ -110,10 +111,12 @@
   - 区画構造パーサーによる抽出は完了している
   - 固有の特殊Mod 8件は、現行メタデータに対応する日本語statがなく検索条件へ解決できない
   - Awakened準拠ではCompletion Reward完全一致、Foil、実Modを検索し、元アイテムにVoid死亡Modがない場合は同ModをNOT条件で除外する
-- [x] Inscribed Ultimatumの検索範囲をAwakened準拠で確認する
+- [ ] **高優先度: Inscribed Ultimatumの詳細検索を実装する**
   - 供物・報酬・試練説明をModへ混ぜないパーサー対応は完了している
-  - Awakenedも基本は`Inscribed Ultimatum`の名前完全一致検索で、供物・報酬・試練Mod・Area Levelを自動条件にはしない
-  - ぽえとれでも専用条件UIは追加せず、名前完全一致品として扱う方針とする
+  - Awakenedは基本的に`Inscribed Ultimatum`の名前完全一致だけだが、ぽえとれでは利用頻度を踏まえて作り込む
+  - 供物、報酬、クリア条件、試練Mod、Area Levelについて、公式Trade APIで利用できるstat／optionと日本語コピーとの対応を監査する
+  - 検索価値と照合精度を確認し、条件ごとの初期ON/OFF・編集可否・専用チップ／Mod欄の配置を決める
+  - 対応できない条件は曖昧な検索へ変換せず、理由を明示して表示のみ、または対象外とする
 - [ ] pseudo定義本体を`trade.py`内の個別定義からレビュー可能な派生データへ移す
   - `group/replaces`の19関係とSHA-256固定は実装済み
   - `_SIMPLE_PSEUDOS`等の寄与ref・対象カテゴリを同じ生成物へ統合する
