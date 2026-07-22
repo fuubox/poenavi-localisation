@@ -1667,6 +1667,7 @@ def build_search_query(
     listed_within: str = "any",
     magic_exact: bool = False,
     exact_base_type: bool = True,
+    item_level_min: int | None = None,
 ) -> dict:
     if trade_status not in TRADE_STATUS_OPTIONS:
         raise ValueError(f"未対応の取引方式です: {trade_status}")
@@ -1676,6 +1677,8 @@ def build_search_query(
         raise ValueError(f"未対応の価格通貨です: {trade_currency}")
     if listed_within not in LISTED_WITHIN_OPTIONS:
         raise ValueError(f"未対応の出品期間です: {listed_within}")
+    if item_level_min is not None and not 1 <= item_level_min <= 100:
+        raise ValueError("アイテムレベルは1～100で指定してください。")
     if preset == PRESET_BASE and PRESET_BASE not in available_trade_presets(item):
         raise ValueError("このアイテムはクラフトベース検索の対象外です。")
     corruption_mode_explicit = include_corrupted is not None
@@ -1868,6 +1871,10 @@ def build_search_query(
             query["stats"].append(group)
             stat_groups[group_key] = group
         group["filters"].append({"id": stat_filter.stat_id, "value": value})
+    if item_level_min is not None:
+        query["filters"].setdefault("misc_filters", {"filters": {}})["filters"]["ilvl"] = {
+            "min": item_level_min
+        }
     return {"query": query, "sort": {"price": "asc"}}
 
 
@@ -1914,6 +1921,7 @@ def search_prices(
     listed_within: str = "any",
     magic_exact: bool = False,
     exact_base_type: bool = True,
+    item_level_min: int | None = None,
 ) -> PriceResult:
     league = league or active_pc_league()
     if (item.rarity.casefold() in {"magic", "マジック"}
@@ -1922,7 +1930,7 @@ def search_prices(
     payload = build_search_query(
         item, trade_base_type, stat_filters, trade_status, trade_name, preset,
         trade_currency, include_corrupted, include_split, trade_discriminator, listed_within,
-        magic_exact, exact_base_type,
+        magic_exact, exact_base_type, item_level_min,
     )
     _require_english_search_identity(payload)
     search_url = f"{API_ROOT}/search/{quote(league, safe='')}"

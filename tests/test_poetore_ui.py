@@ -576,6 +576,37 @@ Split
         window.close()
 
 
+def test_item_level_tag_is_leftmost_editable_state_and_replaces_tree_filter(qapp):
+    window = PoetoreWindow()
+    try:
+        item = parse_item_text("""Item Class: Body Armours
+Rarity: Rare
+Test Armour
+Sacred Chainmail
+--------
+Item Level: 86
+""")
+        window._configure_item_level(item)
+        assert not window.item_level_tag.isHidden()
+        assert window.item_level_edit.text() == "86"
+        assert window.item_level_edit.validator().bottom() == 1
+        assert window.item_level_edit.validator().top() == 100
+        assert window.item_level_tag.parentWidget() is window._panel
+        assert window.item_level_tag.x() <= window.split_combo.x()
+
+        window.item_level_edit.setText("84")
+        assert window._selected_item_level() == 84
+        window._configure_item_level(item)
+        assert window.item_level_edit.text() == "84"
+
+        window._populate_stat_filters((TradeStatFilter(
+            "property.item_level", "アイテムレベル", 86.0, "base", True,
+        ),))
+        assert window.mod_filter_tree.topLevelItemCount() == 0
+    finally:
+        window.close()
+
+
 def test_corrupted_item_defaults_to_corrupted_only(qapp):
     window = PoetoreWindow()
     try:

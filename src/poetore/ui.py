@@ -5,7 +5,7 @@ import re
 from dataclasses import replace
 
 from PySide6.QtCore import QEvent, QObject, QPoint, Qt, QTimer, Signal, QUrl
-from PySide6.QtGui import QDesktopServices
+from PySide6.QtGui import QDesktopServices, QIntValidator
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QApplication, QComboBox, QFrame, QHBoxLayout, QLabel, QLineEdit, QMessageBox, QPushButton,
@@ -312,6 +312,22 @@ class PoetoreWindow(QWidget):
 
         item_state_options = QHBoxLayout()
         item_state_options.setSpacing(6)
+        self.item_level_tag = QFrame()
+        self.item_level_tag.setObjectName("itemLevelTag")
+        self.item_level_tag.setFixedWidth(92)
+        item_level_layout = QHBoxLayout(self.item_level_tag)
+        item_level_layout.setContentsMargins(8, 2, 6, 2)
+        item_level_layout.setSpacing(1)
+        item_level_layout.addWidget(QLabel("ilvl："))
+        self.item_level_edit = QLineEdit()
+        self.item_level_edit.setObjectName("itemLevelEdit")
+        self.item_level_edit.setValidator(QIntValidator(1, 100, self.item_level_edit))
+        self.item_level_edit.setAlignment(Qt.AlignCenter)
+        self.item_level_edit.setFixedWidth(34)
+        self.item_level_edit.setToolTip("検索対象の最小アイテムレベル（1～100）")
+        item_level_layout.addWidget(self.item_level_edit)
+        self.item_level_tag.hide()
+        item_state_options.addWidget(self.item_level_tag)
         self.split_combo = _BinaryToggle(
             ("非スプリット", False), ("スプリット品含む", True),
         )
@@ -474,6 +490,27 @@ class PoetoreWindow(QWidget):
                 font-weight: 700;
             }
             QPushButton#cycleToggle[alert="true"] { color: #ff5757; }
+            QFrame#itemLevelTag {
+                background: rgba(26, 26, 26, 225);
+                border: 1px solid rgba(176, 255, 123, 150);
+                border-radius: 3px;
+            }
+            QFrame#itemLevelTag QLabel {
+                color: #f4ffed;
+                font-weight: 700;
+            }
+            QLineEdit#itemLevelEdit {
+                background: transparent;
+                color: #f4ffed;
+                border: none;
+                padding: 0;
+                min-height: 20px;
+                font-weight: 700;
+            }
+            QLineEdit#itemLevelEdit:focus {
+                border: none;
+                color: #d8ffbd;
+            }
             QPushButton#primaryButton {
                 background: rgba(93, 145, 66, 225);
                 color: #f4ffed;
@@ -783,6 +820,7 @@ class PoetoreWindow(QWidget):
         self._configure_trade_presets(item)
         self._configure_trade_currency(item)
         self._configure_item_state_filters(item)
+        self._configure_item_level(item)
         self._update_item_header(item)
         self.result_tree.clear()
         for label, value in (
@@ -840,6 +878,7 @@ class PoetoreWindow(QWidget):
             if not self.corrupted_combo.isHidden() else None
         )
         include_split = bool(self.split_combo.currentData())
+        item_level_min = self._selected_item_level()
         magic_exact = bool(
             self.magic_rarity_toggle.isVisible() and self.magic_rarity_toggle.currentData()
         )
@@ -889,6 +928,7 @@ class PoetoreWindow(QWidget):
                     listed_within=listed_within,
                     magic_exact=magic_exact,
                     exact_base_type=self._searches_exact_base_type(item),
+                    item_level_min=item_level_min,
                 )
             except (TradeApiError, ValueError) as exc:
                 self._trade_signals.failed.emit(str(exc))
@@ -967,6 +1007,22 @@ class PoetoreWindow(QWidget):
             "gem",
         }
         self.split_combo.setEnabled(supports_split_filter)
+
+    def _configure_item_level(self, item):
+        """新しいアイテムを読み取った時だけ、共通ilvl条件を実値へ戻す。"""
+        key = item.raw_text
+        if key == getattr(self, "_item_level_item_key", None):
+            return
+        self._item_level_item_key = key
+        has_item_level = item.item_level is not None
+        self.item_level_tag.setVisible(has_item_level)
+        self.item_level_edit.setText(str(item.item_level) if has_item_level else "")
+
+    def _selected_item_level(self) -> int | None:
+        if self.item_level_tag.isHidden():
+            return None
+        text = self.item_level_edit.text().strip()
+        return int(text) if text else None
 
     def _trade_preset_changed(self):
         if not hasattr(self, "mod_filter_tree"):
@@ -1058,6 +1114,8 @@ class PoetoreWindow(QWidget):
     def _populate_stat_filters(self, filters: tuple[TradeStatFilter, ...]):
         self.mod_filter_tree.clear()
         for stat_filter in filters:
+            if stat_filter.stat_id == "property.item_level":
+                continue
             value = "" if stat_filter.min_value is None else f"{stat_filter.min_value:g}"
             maximum = "" if stat_filter.max_value is None else f"{stat_filter.max_value:g}"
             details = []

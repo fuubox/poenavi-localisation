@@ -757,6 +757,23 @@ def test_finished_search_state_filters_can_exclude_or_include_items():
     assert corrupted_only["corrupted"] == {"option": "true"}
 
 
+def test_common_item_level_override_replaces_category_specific_range():
+    item = parse_item_text(ITEM)
+    bracket = TradeStatFilter(
+        "property.item_level", "アイテムレベル帯", 84.0, "base", True,
+        max_value=100.0,
+    )
+    query = build_search_query(item, stat_filters=(bracket,), item_level_min=82)["query"]
+    assert query["filters"]["misc_filters"]["filters"]["ilvl"] == {"min": 82}
+
+
+@pytest.mark.parametrize("value", [0, 101])
+def test_common_item_level_override_rejects_out_of_range_values(value):
+    item = parse_item_text(ITEM)
+    with pytest.raises(ValueError, match="1～100"):
+        build_search_query(item, item_level_min=value)
+
+
 def test_search_rejects_unknown_corruption_mode():
     item = parse_item_text(ITEM)
     with pytest.raises(ValueError, match="未対応のコラプト条件"):
