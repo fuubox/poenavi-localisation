@@ -30,7 +30,8 @@ _PROPERTY_LABELS = {
     "ブロック率", "Chance to Block", "移動速度", "Movement Speed",
     "ルーンソケット", "Rune Sockets",
     "アイテム数量", "Item Quantity", "アイテムレアリティ", "Item Rarity",
-    "モンスターパックサイズ", "Monster Pack Size", "エリアレベル", "Area Level",
+    "モンスターパックサイズ", "Monster Pack Size", "モンスターレベル", "Monster Level",
+    "エリアレベル", "Area Level",
     "情報を聞いた区画数", "Wings Revealed", "合計区画数", "Total Wings",
     "依頼書目標の価値", "Heist Target", "必要なジョブ", "Requires",
     "決心", "Resolve", "決心の最大値", "Maximum Resolve", "勇気", "Inspiration",
@@ -58,21 +59,22 @@ _FLAG_LINES = {
     "Searing Exarch Item": "searing_item", "シアリング・エグザークアイテム": "searing_item",
     "Eater of Worlds Item": "tangled_item", "イーター・オブ・ワールズアイテム": "tangled_item",
     "Veiled": "veiled", "ヴェール状態": "veiled", "ヴェール済み": "veiled",
+    "Fractured Item": "fractured", "フラクチャーアイテム": "fractured",
 }
 _CATEGORY_WORDS = (
     (("Captured Beast", "捕獲したビースト", "捕獲済みビースト"), "captured_beast"),
     (("武器", "Weapon", "弓", "Bow", "ワンド", "Wand", "剣", "Sword", "斧", "Axe",
       "メイス", "Mace", "セプター", "Sceptre", "スタッフ", "Staff", "ダガー", "Dagger",
       "クロー", "Claw", "釣り竿", "Fishing Rod"), "weapon"),
-    (("防具", "Armour", "ヘルメット", "Helmet", "グローブ", "Gloves", "ブーツ", "Boots",
-      "鎧", "Body Armour", "盾", "Shield"), "armour"),
+    (("防具", "Armour", "ヘルメット", "Helmet", "兜", "グローブ", "Gloves", "手袋",
+      "ブーツ", "Boots", "靴", "鎧", "胴体防具", "Body Armour", "盾", "Shield"), "armour"),
     (("アクセサリー", "Accessory", "指輪", "Ring", "アミュレット", "Amulet", "ベルト", "Belt"), "accessory"),
     (("クラスタージュエル", "Cluster Jewel"), "cluster_jewel"),
     (("アビスジュエル", "Abyss Jewel"), "abyss_jewel"),
     (("ジュエル", "Jewel"), "jewel"),
     (("ジェム", "Gem"), "gem"),
     (("マップ", "Map"), "map"),
-    (("設計図", "Blueprint"), "heist_blueprint"),
+    (("設計図", "計画書", "Blueprint"), "heist_blueprint"),
     (("契約書", "Contract"), "heist_contract"),
     (("招待状", "Invitation"), "invitation"),
     (("メモリー", "Memory Line", "Atlas Memory"), "memory_line"),
@@ -113,16 +115,33 @@ _GLOSSARY_HELP_LINE = re.compile(
 )
 _JEWEL_HELP_LINES = {
     "パッシブツリーで割り当てられたジュエルソケットにはめる。右クリックしてソケットから取り外すことができる。",
+    "パッシブツリーで割り当てられたジュエルソケット(大)または(中)にはめる。追加されたパッシブは他の半径を持つジュエルと相互作用しない。右クリックしてソケットから取り外すことができる。",
     "Place into an allocated Jewel Socket on the Passive Skill Tree. Right click to remove from the Socket.",
 }
 _MODIFIER_HELP_LINES = {
     "(アーマー、回避力、エナジーシールドは標準的な防御力である)",
     "(Armour, Evasion Rating and Energy Shield are the standard Defences)",
 }
+_INLINE_MODIFIER_MARKER = re.compile(
+    r"[（(](?:implicit|暗黙|enchant|エンチャント|crafted|クラフト|fractured|フラクチャー)[）)]\s*$",
+    re.IGNORECASE,
+)
+_PARENTHETICAL_LINE = re.compile(r"^[（(].*[）)]$")
 _CATEGORY_HELP_LINES = {
     "flask": {
         "右クリックして飲む。腰につけているときだけチャージを貯めることができる。モンスターを倒すことで充填される。",
         "Right click to drink. Can only hold charges while in belt. Refills as you kill monsters.",
+    },
+    "map": {
+        "自身のマップデバイスで使用することでこのティアまたはそれよりティアの低いマップに移動する。マップは一度のみ使用できる。",
+        "Travel to this Map by using it in a personal Map Device. Maps can only be used once.",
+    },
+    "heist_blueprint": {
+        "ローグハーバーにいる特定のNPCに話しかけ、諜報を使って追加の区画や部屋の情報を聞くことができます。この計画書をアーディアに渡して、グランドハイストに着手してください。",
+    },
+    "expedition_logbook": {
+        "このアイテムをダニグに渡し、自身の隠れ家でエクスペディションへのポータルを開く。",
+        "Take this item to Dannig in your Hideout to open portals to an Expedition.",
     },
 }
 
@@ -143,6 +162,7 @@ _LOGBOOK_FACTIONS = {
     "黒い鎌の傭兵団": ("Has Logbook Faction: Black Scythe Mercenaries", "pseudo.pseudo_logbook_faction_mercenaries"),
     "Druids of the Broken Circle": ("Has Logbook Faction: Druids of the Broken Circle", "pseudo.pseudo_logbook_faction_druids"),
     "壊れた環の祭司": ("Has Logbook Faction: Druids of the Broken Circle", "pseudo.pseudo_logbook_faction_druids"),
+    "断たれた円環のドルイド": ("Has Logbook Faction: Druids of the Broken Circle", "pseudo.pseudo_logbook_faction_druids"),
     "Knights of the Sun": ("Has Logbook Faction: Knights of the Sun", "pseudo.pseudo_logbook_faction_knights"),
     "太陽の騎士団": ("Has Logbook Faction: Knights of the Sun", "pseudo.pseudo_logbook_faction_knights"),
     "Order of the Chalice": ("Has Logbook Faction: Order of the Chalice", "pseudo.pseudo_logbook_faction_order"),
@@ -242,6 +262,15 @@ def _modifier_header_kind(line: str) -> str | None:
         if any(label.lower() in body for label in labels):
             return kind
     return None
+
+
+def _section_has_modifier_evidence(section: list[str]) -> bool:
+    """詳細コピーでMod区画と断定できる構造上の目印を返す。"""
+    return any(
+        _modifier_header_details(line) is not None
+        or _INLINE_MODIFIER_MARKER.search(line) is not None
+        for line in section
+    )
 
 
 def _modifier_header_details(
@@ -360,6 +389,11 @@ def parse_item_text(text: str) -> ParsedItem:
     item_category = _category_with_item_identity(
         header.get("item_class", ""), name, base_type, text,
     )
+    detailed_copy = any(
+        _modifier_header_details(line) is not None
+        for section in sections[1:]
+        for line in section
+    )
     for section_index, section in enumerate(sections[1:], start=1):
         # Mod見出しの効果範囲は同一区画内だけ。次の区切り以降へ持ち越さない。
         current_header_kind = None
@@ -371,6 +405,11 @@ def parse_item_text(text: str) -> ParsedItem:
             section, rarity, item_category, bool(modifiers),
         ):
             continue
+        section_has_modifier_evidence = _section_has_modifier_evidence(section)
+        logbook_area_section = (
+            item_category == "expedition_logbook"
+            and any(line in _LOGBOOK_FACTIONS for line in section)
+        )
         # 装備性能・装備条件など、item levelより前の区画は検索Modではない。
         metadata_section = not reached_item_level
         for line in section:
@@ -409,8 +448,15 @@ def parse_item_text(text: str) -> ParsedItem:
                  current_header_generation, current_header_name) = header_details
                 current_modifier_group += 1
                 continue
+            # 詳細コピーでは構造上Modと確認できる区画だけを解析する。
+            # 通常コピーはMod見出しがないため、従来のメタデータ照合経路を維持する。
+            if detailed_copy and not section_has_modifier_evidence:
+                continue
             line = _normalized_modifier_line(line, item_category)
             if line is None:
+                continue
+            if logbook_area_section and line == section[0] and line not in _LOGBOOK_FACTIONS:
+                # Logbookの各区画先頭はエリア名であり、検索Modではない。
                 continue
             if item_category == "expedition_logbook" and line in _LOGBOOK_FACTIONS:
                 ref, stat_id = _LOGBOOK_FACTIONS[line]
@@ -461,6 +507,9 @@ def parse_item_text(text: str) -> ParsedItem:
                 metadata, confidence = default_metadata_index().match_ref(
                     current_header_name, kind,
                 )
+            if metadata is None and detailed_copy and _PARENTHETICAL_LINE.fullmatch(line):
+                # 詳細コピーでMod直後に付く用語説明・上限説明は検索条件ではない。
+                continue
             roll_min, roll_max = _roll_bounds(line)
             inferred_affix = None
             if metadata and kind == "crafted":
