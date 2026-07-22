@@ -362,6 +362,27 @@ Item Level: 85
     assert exact_query["filters"]["type_filters"]["filters"]["rarity"] == {"option": "magic"}
 
 
+def test_nonexact_accessory_search_uses_item_class_category():
+    cases = (
+        ("Rings", "Ruby Ring", "accessory.ring"),
+        ("指輪", "ルビーの指輪", "accessory.ring"),
+        ("Amulets", "Gold Amulet", "accessory.amulet"),
+        ("Belts", "Leather Belt", "accessory.belt"),
+    )
+    for item_class, base_type, expected_category in cases:
+        item = ParsedItem(
+            item_class=item_class, rarity="Rare", name=base_type,
+            base_type=base_type, category="accessory", item_level=80,
+        )
+        query = build_search_query(
+            item, base_type, (), preset=PRESET_FINISHED, exact_base_type=False,
+        )["query"]
+        assert "type" not in query
+        assert query["filters"]["type_filters"]["filters"]["category"] == {
+            "option": expected_category,
+        }
+
+
 def test_normal_unidentified_and_magic_abyss_do_not_offer_base_preset():
     normal = parse_item_text(ITEM.replace("Rarity: Rare", "Rarity: Normal").replace(
         "Storm Reach\nReaver Sword", "Reaver Sword",

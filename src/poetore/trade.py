@@ -63,6 +63,9 @@ _ITEM_CLASS_TRADE_CATEGORIES = {
     "Two Hand Maces": "weapon.twomace", "両手メイス": "weapon.twomace",
     "Two Hand Swords": "weapon.twosword", "両手剣": "weapon.twosword",
     "Wands": "weapon.wand", "ワンド": "weapon.wand",
+    "Rings": "accessory.ring", "指輪": "accessory.ring",
+    "Amulets": "accessory.amulet", "アミュレット": "accessory.amulet",
+    "Belts": "accessory.belt", "ベルト": "accessory.belt",
 }
 
 
