@@ -119,6 +119,12 @@ _MODIFIER_HELP_LINES = {
     "(アーマー、回避力、エナジーシールドは標準的な防御力である)",
     "(Armour, Evasion Rating and Energy Shield are the standard Defences)",
 }
+_CATEGORY_HELP_LINES = {
+    "flask": {
+        "右クリックして飲む。腰につけているときだけチャージを貯めることができる。モンスターを倒すことで充填される。",
+        "Right click to drink. Can only hold charges while in belt. Refills as you kill monsters.",
+    },
+}
 
 # Replica固有Modなど、公式Trade statは「増加」を正方向として持つ一方、
 # 詳細コピーでは同じstatが「減少」として出るものを明示的に正規化する。
@@ -211,6 +217,8 @@ def _normalized_modifier_line(line: str, item_category: str | None = None) -> st
     if _GLOSSARY_HELP_LINE.fullmatch(line):
         return None
     if line.strip() in _MODIFIER_HELP_LINES:
+        return None
+    if line.strip() in _CATEGORY_HELP_LINES.get(item_category or "", set()):
         return None
     normalized = _UNSCALABLE_VALUE_SUFFIX.sub("", line).rstrip()
     return normalized or None

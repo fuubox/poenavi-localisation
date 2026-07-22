@@ -456,6 +456,34 @@ Synthesised Item
         self.assertEqual(modifier.affix, "prefix")
         self.assertEqual(modifier.generation, "crusader")
 
+    def test_ignores_flask_usage_help_text_in_japanese_and_english(self):
+        japanese = parse_item_text("""アイテムクラス: ユーティリティフラスコ
+レアリティ: ノーマル
+Quicksilver Flask
+--------
+6秒間持続
+使用時に60中30チャージを消費
+現在0チャージ
+移動スピードが40%増加する
+--------
+装備要求:
+レベル: 4
+--------
+アイテムレベル: 4
+--------
+右クリックして飲む。腰につけているときだけチャージを貯めることができる。モンスターを倒すことで充填される。
+""")
+        english = parse_item_text("""Item Class: Utility Flasks
+Rarity: Normal
+Quicksilver Flask
+--------
+Item Level: 4
+--------
+Right click to drink. Can only hold charges while in belt. Refills as you kill monsters.
+""")
+        self.assertEqual(japanese.modifiers, ())
+        self.assertEqual(english.modifiers, ())
+
 
 if __name__ == "__main__":
     unittest.main()
