@@ -22,6 +22,7 @@ vendor_search_presets.json
 vendor_search_presets_poe1.json
 vendor_search_presets_poe2.json
 .dev-user-data/
+.dev-user-data-act1/
 .prerelease-test-user-data/
 
 # IDE

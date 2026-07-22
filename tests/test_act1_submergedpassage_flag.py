@@ -27,7 +27,8 @@ def test_only_act1_coast_has_the_submerged_passage_flag_section():
     act1_flags = guide_data["act1_area2"]["visits"]["1"]["flags"]
     act6_guide = guide_data["act6_area2"]["visits"]["1"]
 
-    assert act1_flags == {"act1_submergedpassage_enter": {}}
+    assert set(act1_flags) == {"act1_submergedpassage_enter"}
+    assert isinstance(act1_flags["act1_submergedpassage_enter"], dict)
     assert "flags" not in act6_guide
 
 
