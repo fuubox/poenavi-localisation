@@ -6147,9 +6147,9 @@ class MainWindow(QMainWindow):
             if self.poe_version == POE1:
                 self._save_progress_flags()
         if actual_entry and self.poe_version == POE1:
-            # Act1 牢獄 -下層- / The Lower Prison 到達フラグ。
-            if zone_id == "act1_area8":
-                self.set_progress_flag("act1_lowerprison_enter")
+            # Act1 水没した海底洞窟 到達フラグ。海底通路の復帰後ガイド切替に使う。
+            if zone_id == "act1_area9":
+                self.set_progress_flag("act1_floodeddepths_enter")
             # Act1 船の墓場の洞窟 到達フラグ。船の墓場の復帰後ガイド切替に使う。
             if zone_id == "act1_area13":
                 self.set_progress_flag("act1_shipgraveyardcave_enter")

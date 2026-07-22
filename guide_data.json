@@ -62,14 +62,10 @@
         "tips": "",
         "direction": "none",
         "flags": {
-          "act1_lowerprison_enter": {
-            "objective": "橋の近くを探索して、「水没した海底洞窟」へ入る",
-            "layout": "「水没した海底洞窟」は必ず橋の手前のエリアにあり、基本的に橋から下方向に存在する\n（ただし、１パターンだけ、上方向に存在するレイアウトも存在するため注意）",
+          "act1_floodeddepths_enter": {
+            "objective": "",
+            "layout": "",
             "tips": "",
-            "mini_navi": {
-              "text": "▸橋の近くを探索して、[move]<span style='color:#dddd44'>水没した海底洞窟</span>へ入る\n  （入口は必ず橋の手前エリアにあり、基本は橋から下側にあるが、\n    １パターンだけ、上方向にあるレイアウトも存在する）",
-              "direction": "none"
-            },
             "direction": "none"
           }
         },
