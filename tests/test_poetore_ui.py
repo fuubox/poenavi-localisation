@@ -596,8 +596,21 @@ Item Level: 86
 
         window.item_level_edit.setText("84")
         assert window._selected_item_level() == 84
+        window.item_level_toggle.click()
+        assert window._selected_item_level_range() == (None, None)
+        assert window.item_level_tag.property("active") is False
+        window.item_level_toggle.click()
+        assert window._selected_item_level_range() == (84, None)
+        assert window.item_level_tag.property("active") is True
+
+        window.item_level_toggle.click()
+        window.item_level_edit.setFocus()
+        window.item_level_edit.selectAll()
+        QTest.keyClicks(window.item_level_edit, "82")
+        assert window._selected_item_level_range() == (82, None)
+        assert window.item_level_tag.property("active") is True
         window._configure_item_level(item)
-        assert window.item_level_edit.text() == "84"
+        assert window.item_level_edit.text() == "82"
 
         window._populate_stat_filters((TradeStatFilter(
             "property.item_level", "アイテムレベル", 86.0, "base", True,

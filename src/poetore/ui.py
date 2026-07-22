@@ -318,13 +318,18 @@ class PoetoreWindow(QWidget):
         item_level_layout = QHBoxLayout(self.item_level_tag)
         item_level_layout.setContentsMargins(8, 2, 6, 2)
         item_level_layout.setSpacing(1)
-        item_level_layout.addWidget(QLabel("ilvl："))
+        self.item_level_toggle = QPushButton("ilvl：")
+        self.item_level_toggle.setObjectName("itemLevelToggle")
+        self.item_level_toggle.setToolTip("クリックしてアイテムレベル条件を有効／無効にします")
+        self.item_level_toggle.clicked.connect(self._toggle_item_level_filter)
+        item_level_layout.addWidget(self.item_level_toggle)
         self.item_level_edit = QLineEdit()
         self.item_level_edit.setObjectName("itemLevelEdit")
         self.item_level_edit.setValidator(QIntValidator(1, 100, self.item_level_edit))
         self.item_level_edit.setAlignment(Qt.AlignCenter)
         self.item_level_edit.setFixedWidth(34)
         self.item_level_edit.setToolTip("検索対象の最小アイテムレベル（1～100）")
+        self.item_level_edit.textEdited.connect(self._enable_item_level_filter)
         item_level_layout.addWidget(self.item_level_edit)
         self.item_level_range_separator = QLabel("～")
         self.item_level_range_separator.hide()
@@ -335,6 +340,7 @@ class PoetoreWindow(QWidget):
         self.item_level_max_edit.setAlignment(Qt.AlignCenter)
         self.item_level_max_edit.setFixedWidth(34)
         self.item_level_max_edit.setToolTip("検索対象の最大アイテムレベル（1～100）")
+        self.item_level_max_edit.textEdited.connect(self._enable_item_level_filter)
         self.item_level_max_edit.hide()
         item_level_layout.addWidget(self.item_level_max_edit)
         self.item_level_tag.hide()
@@ -510,7 +516,14 @@ class PoetoreWindow(QWidget):
                 color: #f4ffed;
                 font-weight: 700;
             }
-            QLineEdit#itemLevelEdit {
+            QPushButton#itemLevelToggle {
+                background: transparent;
+                color: #f4ffed;
+                border: none;
+                padding: 0;
+                font-weight: 700;
+            }
+            QLineEdit#itemLevelEdit, QLineEdit#itemLevelMaxEdit {
                 background: transparent;
                 color: #f4ffed;
                 border: none;
@@ -518,9 +531,18 @@ class PoetoreWindow(QWidget):
                 min-height: 20px;
                 font-weight: 700;
             }
-            QLineEdit#itemLevelEdit:focus {
+            QLineEdit#itemLevelEdit:focus, QLineEdit#itemLevelMaxEdit:focus {
                 border: none;
                 color: #d8ffbd;
+            }
+            QFrame#itemLevelTag[active="false"] {
+                border-color: rgba(130, 140, 125, 90);
+                background: rgba(20, 20, 20, 180);
+            }
+            QFrame#itemLevelTag[active="false"] QPushButton,
+            QFrame#itemLevelTag[active="false"] QLineEdit,
+            QFrame#itemLevelTag[active="false"] QLabel {
+                color: #687064;
             }
             QPushButton#primaryButton {
                 background: rgba(93, 145, 66, 225);
@@ -1028,6 +1050,7 @@ class PoetoreWindow(QWidget):
         self._item_level_item_key = key
         has_item_level = item.item_level is not None
         self.item_level_tag.setVisible(has_item_level)
+        self._set_item_level_filter_enabled(has_item_level)
         is_cluster = has_item_level and item.category == "cluster_jewel"
         self.item_level_range_separator.setVisible(is_cluster)
         self.item_level_max_edit.setVisible(is_cluster)
@@ -1044,8 +1067,25 @@ class PoetoreWindow(QWidget):
     def _selected_item_level(self) -> int | None:
         return self._selected_item_level_range()[0]
 
+    def _toggle_item_level_filter(self):
+        self._set_item_level_filter_enabled(not getattr(self, "_item_level_filter_enabled", False))
+
+    def _enable_item_level_filter(self, _text: str = ""):
+        self._set_item_level_filter_enabled(True)
+
+    def _set_item_level_filter_enabled(self, enabled: bool):
+        self._item_level_filter_enabled = bool(enabled)
+        self.item_level_tag.setProperty("active", self._item_level_filter_enabled)
+        self.item_level_tag.style().unpolish(self.item_level_tag)
+        self.item_level_tag.style().polish(self.item_level_tag)
+        self.item_level_toggle.setToolTip(
+            "クリックしてアイテムレベル条件を無効にします"
+            if self._item_level_filter_enabled else
+            "クリックしてアイテムレベル条件を有効にします"
+        )
+
     def _selected_item_level_range(self) -> tuple[int | None, int | None]:
-        if self.item_level_tag.isHidden():
+        if self.item_level_tag.isHidden() or not getattr(self, "_item_level_filter_enabled", False):
             return None, None
         minimum_text = self.item_level_edit.text().strip()
         maximum_text = self.item_level_max_edit.text().strip() if not self.item_level_max_edit.isHidden() else ""
