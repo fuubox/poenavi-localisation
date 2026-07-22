@@ -32,9 +32,12 @@
 `docs/poetore-awakened-ui-and-poeninja-audit.md`の監査結果を基準とする。
 
 - [x] 武器
-- [ ] 防具・盾
-  - Armour、Evasion、ES、Ward、Block、base percentileを必要なものだけ表示する
+- [x] 防具・盾
+  - 完成品は`Block → Armour → Evasion → ES → Ward`の順で実在値だけ表示し、初期ONにする
   - ハイブリッド防具では実在する防御値をすべて表示する
+  - ベースアイテムは実防御値を初期OFF、ilvl・base percentileを初期ONにする
+  - base percentileは上段の編集・ON/OFF可能な`ベース防御値`チップへ集約する
+  - 品質20は初期OFF、21以上は初期ON、Influenceはベースアイテムで初期ONにする
 - [ ] アクセサリー・通常装備
   - Life、耐性、能力値、Anointment、Veiled等を整理する
 - [ ] Jewel／Abyss Jewel／Cluster Jewel

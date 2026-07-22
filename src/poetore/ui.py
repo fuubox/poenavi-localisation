@@ -317,7 +317,9 @@ class _CycleButton(QPushButton):
 class _NumericFilterChip(QFrame):
     """ON/OFFと最小値（必要なら最大値）を持つ共通検索チップ。"""
 
-    def __init__(self, label: str, minimum: int, maximum: int, parent=None):
+    def __init__(
+        self, label: str, minimum: int, maximum: int, parent=None, suffix: str = "",
+    ):
         super().__init__(parent)
         self.setObjectName("numericFilterTag")
         self._active = True
@@ -345,6 +347,9 @@ class _NumericFilterChip(QFrame):
         self.maximum_edit.textEdited.connect(lambda _text: self.setActive(True))
         layout.addWidget(self.separator)
         layout.addWidget(self.maximum_edit)
+        self.suffix_label = QLabel(suffix)
+        self.suffix_label.setVisible(bool(suffix))
+        layout.addWidget(self.suffix_label)
         self.setRangeVisible(False)
         self.setActive(True)
 
@@ -729,9 +734,16 @@ class PoetoreWindow(QWidget):
         self.foil_chip.hide()
         self.map_tier_chip = _NumericFilterChip("Tier", 1, 17)
         self.map_tier_chip.setFixedWidth(116)
+        self.base_percentile_chip = _NumericFilterChip(
+            "ベース防御値", 0, 100, suffix="%",
+        )
+        self.base_percentile_chip.setFixedWidth(174)
         self.area_level_chip = _NumericFilterChip("Area Lv", 1, 100)
         self.heist_wings_chip = _NumericFilterChip("公開Wing", 1, 4)
-        for chip in (self.map_tier_chip, self.area_level_chip, self.heist_wings_chip):
+        for chip in (
+            self.map_tier_chip, self.base_percentile_chip,
+            self.area_level_chip, self.heist_wings_chip,
+        ):
             chip.hide()
         self.blighted_chip = QPushButton()
         self.blighted_chip.setObjectName("readonlyFilterChip")
@@ -755,6 +767,7 @@ class PoetoreWindow(QWidget):
             ("heist_wings", self.heist_wings_chip),
             ("blighted", self.blighted_chip),
             ("item_level", self.item_level_tag),
+            ("base_percentile", self.base_percentile_chip),
             ("gem_level", self.gem_level_tag),
             ("quality", self.gem_quality_tag),
             *((f"influence_{name}", self.influence_chips[name]) for name in _INFLUENCE_CHIPS),
@@ -1571,6 +1584,7 @@ class PoetoreWindow(QWidget):
                 )
                 special_ids = {
                     "property.map_tier", "property.area_level", "property.heist_wings",
+                    "property.base_percentile",
                     "property.map_blighted", "property.map_uberblighted",
                     "property.map_completion_reward",
                 }
@@ -1976,6 +1990,7 @@ class PoetoreWindow(QWidget):
 
         numeric = (
             (self.map_tier_chip, "property.map_tier", True),
+            (self.base_percentile_chip, "property.base_percentile", False),
             (self.area_level_chip, "property.area_level", False),
             (self.heist_wings_chip, "property.heist_wings", False),
         )
@@ -2001,6 +2016,7 @@ class PoetoreWindow(QWidget):
         selected = []
         for chip, stat_id in (
             (self.map_tier_chip, "property.map_tier"),
+            (self.base_percentile_chip, "property.base_percentile"),
             (self.area_level_chip, "property.area_level"),
             (self.heist_wings_chip, "property.heist_wings"),
         ):
@@ -2129,6 +2145,7 @@ class PoetoreWindow(QWidget):
                 continue
             if stat_filter.stat_id in {
                 "property.map_tier", "property.area_level", "property.heist_wings",
+                "property.base_percentile",
                 "property.map_blighted", "property.map_uberblighted",
                 "property.map_completion_reward",
             }:

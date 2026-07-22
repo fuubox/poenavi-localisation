@@ -1021,7 +1021,7 @@ def test_filter_chips_follow_awakened_order_in_shared_flow_layout(qapp):
     try:
         assert tuple(name for name, _widget in window._filter_chips) == (
             "links", "map_tier", "completion_reward", "area_level", "heist_wings",
-            "blighted", "item_level", "gem_level", "quality",
+            "blighted", "item_level", "base_percentile", "gem_level", "quality",
             "influence_shaper", "influence_elder", "influence_crusader",
             "influence_hunter", "influence_redeemer", "influence_warlord",
             "magic_rarity", "unidentified", "veiled", "foil", "mirrored", "split",
@@ -1249,6 +1249,51 @@ Item Level: 84
         window._parsed_item = flask21
         window._configure_quality(flask21)
         assert window._selected_quality() == 21
+    finally:
+        window.close()
+
+
+def test_armour_base_percentile_is_an_editable_base_only_chip(qapp):
+    window = PoetoreWindow()
+    try:
+        item = parse_item_text("""アイテムクラス: 盾
+レアリティ: レア
+Test Guard
+Cardinal Round Shield
+--------
+ブロック率: 25%
+アーマー: 220
+回避力: 220
+--------
+アイテムレベル: 86
+""")
+        window._parsed_item = item
+        window._trade_base_type = "Cardinal Round Shield"
+        window._configure_trade_presets(item)
+        window._configure_special_filter_chips(item)
+        assert window.base_percentile_chip.isHidden()
+
+        window.trade_preset_combo.setCurrentIndex(1)
+        assert not window.base_percentile_chip.isHidden()
+        assert window.base_percentile_chip.isActive()
+        assert window.base_percentile_chip.suffix_label.text() == "%"
+        minimum, maximum = window.base_percentile_chip.values()
+        assert minimum is not None
+        assert maximum is None
+
+        window.base_percentile_chip.toggle.click()
+        assert not window.base_percentile_chip.isActive()
+        assert not any(
+            row.stat_id == "property.base_percentile"
+            for row in window._selected_special_chip_filters()
+        )
+
+        window.base_percentile_chip.minimum_edit.setFocus()
+        window.base_percentile_chip.minimum_edit.selectAll()
+        QTest.keyClicks(window.base_percentile_chip.minimum_edit, "80")
+        selected = window._selected_special_chip_filters()
+        percentile = next(row for row in selected if row.stat_id == "property.base_percentile")
+        assert percentile.min_value == 80
     finally:
         window.close()
 

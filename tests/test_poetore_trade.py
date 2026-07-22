@@ -508,6 +508,61 @@ def test_single_and_hybrid_armour_enable_every_present_defence():
         ]
 
 
+def test_shield_finished_and_base_presets_use_armour_specific_order_and_defaults():
+    item = parse_item_text("""アイテムクラス: 盾
+レアリティ: レア
+Test Guard
+Cardinal Round Shield
+--------
+ブロック率: 25%
+アーマー: 400
+回避力: 300
+エナジーシールド: 100
+--------
+アイテムレベル: 86
+""")
+    with patch("src.poetore.trade._trade_stat_entries", return_value=()):
+        finished = resolve_trade_stat_filters(item)
+        base = resolve_trade_stat_filters(item, PRESET_BASE)
+
+    property_ids = {
+        "property.block", "property.armour", "property.evasion",
+        "property.energy_shield", "property.ward",
+    }
+    assert [row.stat_id for row in finished if row.stat_id in property_ids] == [
+        "property.block", "property.armour", "property.evasion",
+        "property.energy_shield",
+    ]
+    assert all(row.enabled for row in finished if row.stat_id in property_ids)
+    assert not any(row.stat_id == "property.base_percentile" for row in finished)
+
+    base_properties = [row for row in base if row.stat_id in property_ids]
+    assert [row.stat_id for row in base_properties] == [
+        "property.block", "property.armour", "property.evasion",
+        "property.energy_shield",
+    ]
+    assert not any(row.enabled for row in base_properties)
+
+
+def test_normal_armour_dedicated_base_search_uses_base_defaults():
+    item = parse_item_text("""アイテムクラス: 盾
+レアリティ: ノーマル
+Cardinal Round Shield
+--------
+ブロック率: 25%
+アーマー: 220
+回避力: 220
+--------
+アイテムレベル: 86
+""")
+    filters = resolve_trade_stat_filters(item, trade_base_type="Cardinal Round Shield")
+    by_id = {row.stat_id: row for row in filters}
+    assert by_id["property.base_percentile"].enabled
+    assert not by_id["property.block"].enabled
+    assert not by_id["property.armour"].enabled
+    assert not by_id["property.evasion"].enabled
+
+
 def test_quality_above_20_is_not_normalized_down():
     item = parse_item_text(ITEM.replace(
         "Two Hand Sword\nPhysical Damage", "Two Hand Sword\nQuality: +30% (augmented)\nPhysical Damage",
@@ -588,7 +643,6 @@ Sacred Chainmail
     assert enabled == {
         "property.armour": 2646.0,
         "property.energy_shield": 577.8,
-        "property.base_percentile": 90.0,
         "property.quality": 30.0,
     }
     assert item.flags == ("split", "influence:crusader", "influence:warlord")
@@ -639,7 +693,9 @@ Memory Strands: 70
 Item Level: 85
 """)
     with patch("src.poetore.trade._trade_stat_entries", return_value=()):
-        filters = resolve_trade_stat_filters(item, trade_base_type="Sacred Chainmail")
+        filters = resolve_trade_stat_filters(
+            item, PRESET_BASE, trade_base_type="Sacred Chainmail",
+        )
     by_id = {row.stat_id: row for row in filters}
     assert by_id["property.base_percentile"].read_value == 50.0
     assert by_id["property.base_percentile"].min_value == 45.0

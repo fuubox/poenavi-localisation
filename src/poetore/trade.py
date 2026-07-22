@@ -591,7 +591,9 @@ def _apply_dedicated_exact_rules(
         keep_modifier_kinds.add("crafted")
 
     property_ids = {
-        "property.base_percentile", "property.memory_strands", "property.quality",
+        "property.armour", "property.evasion", "property.energy_shield",
+        "property.ward", "property.block", "property.base_percentile",
+        "property.memory_strands", "property.quality",
         "property.sockets", "property.links", "property.white_sockets",
     }
     special_kinds = {
@@ -629,7 +631,15 @@ def _apply_dedicated_exact_rules(
                 logbook_faction_seen = True
             result.append(replace(row, enabled=enabled))
         elif row.stat_id in property_ids:
-            result.append(row)
+            if item.category == "armour" and row.stat_id in {
+                "property.armour", "property.evasion", "property.energy_shield",
+                "property.ward", "property.block",
+            }:
+                result.append(replace(row, enabled=False))
+            elif row.stat_id == "property.base_percentile":
+                result.append(replace(row, enabled=True))
+            else:
+                result.append(row)
     return tuple(result)
 
 
@@ -729,9 +739,18 @@ def _base_item_filters(item: ParsedItem, trade_base_type: str | None = None) -> 
             (modifier.kind if modifier.kind not in {"prefix", "suffix"}
              else f"T{modifier.tier}" if modifier.tier else "explicit"), enabled,
         ))
+    base_property_ids = {
+        "property.armour", "property.evasion", "property.energy_shield",
+        "property.ward", "property.block", "property.base_percentile",
+        "property.memory_strands",
+    }
     special_properties = tuple(
-        row for row in _initial_property_filters(item, trade_base_type)
-        if row.stat_id in {"property.base_percentile", "property.memory_strands"}
+        replace(
+            row,
+            enabled=(row.stat_id in {"property.base_percentile", "property.memory_strands"}),
+        )
+        for row in _initial_property_filters(item, trade_base_type)
+        if row.stat_id in base_property_ids
     )
     return tuple(filters) + special_properties + _item_detail_filters(item)
 
@@ -1012,6 +1031,11 @@ def _initial_property_filters(item: ParsedItem, trade_base_type: str | None = No
                 "property.crit", "クリティカル率", _relaxed(crit), "property", False,
             ))
     elif item.category == "armour":
+        block = _property_value(item, "ブロック率", "Chance to Block")
+        if block is not None:
+            filters.append(TradeStatFilter(
+                "property.block", "ブロック率", _relaxed(block), "property", True,
+            ))
         defenses = [
             ("property.armour", "アーマー", _property_value(item, "アーマー", "防具", "Armour")),
             ("property.evasion", "回避力", _property_value(item, "回避力", "Evasion Rating")),
@@ -1024,11 +1048,6 @@ def _initial_property_filters(item: ParsedItem, trade_base_type: str | None = No
         ]
         for stat_id, text, value in present:
             filters.append(TradeStatFilter(stat_id, text, _relaxed(value), "property", True))
-        block = _property_value(item, "ブロック率", "Chance to Block")
-        if block is not None:
-            filters.append(TradeStatFilter(
-                "property.block", "ブロック率", _relaxed(block), "property", False,
-            ))
         percentile = _base_defence_percentile(item, trade_base_type)
         if percentile is not None:
             filters.append(TradeStatFilter(
@@ -1662,14 +1681,19 @@ def resolve_trade_stat_filters(
     if unique_item:
         special_properties = tuple(
             row for row in _initial_property_filters(item, trade_base_type)
-            if row.stat_id in {"property.base_percentile", "property.block", "property.memory_strands"}
+            if row.stat_id in {"property.block", "property.memory_strands"}
         )
         return _decorate_filters(
             item, special_properties + individual + _item_detail_filters(item)
             + _unique_exception_filters(item) + _special_content_filters(item), True,
         )
+    initial_properties = [
+        row for row in _initial_property_filters(item, trade_base_type)
+        if (row.stat_id != "property.base_percentile"
+            or uses_dedicated_exact_preset(item))
+    ]
     filters = (
-        tuple(_initial_property_filters(item, trade_base_type) + _gear_pseudo_filters(item))
+        tuple(initial_properties + _gear_pseudo_filters(item))
         + individual + _item_detail_filters(item) + _empty_affix_filters(item)
         + _special_content_filters(item)
     )
