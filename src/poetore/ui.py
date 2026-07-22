@@ -19,6 +19,7 @@ from .window_position import PlacementContext, capture_placement_context, positi
 from .trade import (
     PRESET_BASE, PRESET_FINISHED, PriceResult, TradeApiError, TradeStatFilter,
     available_pc_leagues, available_trade_presets, default_pc_league, default_trade_currency,
+    gem_metadata,
     resolve_trade_stat_filters, search_prices, unique_candidates,
     unique_variants, unresolved_modifier_warnings, uses_dedicated_exact_preset,
 )
@@ -1222,10 +1223,19 @@ class PoetoreWindow(QWidget):
         self._gem_quality_item_key = key
         raw_quality = item.properties.get("品質") if item.category == "gem" else None
         match = re.search(r"\d+", str(raw_quality or ""))
-        quality = int(match.group()) if match else None
+        quality = int(match.group()) if match and int(match.group()) > 0 else None
         self.gem_quality_tag.setVisible(quality is not None)
         self.gem_quality_edit.setText(str(quality) if quality is not None else "")
-        self._set_gem_quality_filter_enabled(quality is not None)
+        enabled = False
+        if quality is not None:
+            info = gem_metadata(self._trade_base_type or item.base_type)
+            maximum = int(info.get("max_level", 20))
+            enabled = (
+                maximum == 1
+                or (maximum == 20 and not info.get("transfigured") and quality >= 16)
+                or ((maximum != 20 or info.get("transfigured")) and quality >= 20)
+            )
+        self._set_gem_quality_filter_enabled(enabled)
 
     def _toggle_gem_quality_filter(self):
         self._set_gem_quality_filter_enabled(not getattr(self, "_gem_quality_filter_enabled", False))

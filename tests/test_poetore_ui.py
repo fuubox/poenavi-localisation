@@ -718,6 +718,36 @@ def test_gem_quality_chip_uses_read_quality_and_can_be_toggled_and_edited(qapp):
         window.close()
 
 
+@pytest.mark.parametrize(("quality", "metadata", "visible", "enabled"), [
+    (0, {"max_level": 20}, False, False),
+    (15, {"max_level": 20}, True, False),
+    (16, {"max_level": 20}, True, True),
+    (19, {"max_level": 20, "transfigured": True}, True, False),
+    (20, {"max_level": 20, "transfigured": True}, True, True),
+    (1, {"max_level": 1}, True, True),
+])
+def test_gem_quality_chip_initial_state_matches_awakened(
+    qapp, quality, metadata, visible, enabled,
+):
+    window = PoetoreWindow()
+    try:
+        item = parse_item_text(f"""アイテムクラス: スキルジェム
+レアリティ: ジェム
+テストジェム
+--------
+レベル: 1
+品質: +{quality}%
+""")
+        with patch("src.poetore.ui.gem_metadata", return_value=metadata):
+            window._configure_gem_quality(item)
+
+        assert window.gem_quality_tag.isHidden() is (not visible)
+        assert window._selected_gem_quality() == (quality if enabled else None)
+        assert window.gem_quality_tag.property("active") is enabled
+    finally:
+        window.close()
+
+
 def test_corrupted_item_defaults_to_corrupted_only(qapp):
     window = PoetoreWindow()
     try:
