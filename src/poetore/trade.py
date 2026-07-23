@@ -716,7 +716,7 @@ def _dedicated_exact_identity_filters(item: ParsedItem) -> tuple[TradeStatFilter
         else:
             filters.append(TradeStatFilter(
                 "property.item_level", "アイテムレベル", float(min(item.item_level, 86)),
-                "base", True,
+                "base", item.category not in {"flask", "tincture"},
             ))
     for flag in item.flags:
         if not flag.startswith("influence:"):
@@ -2575,6 +2575,8 @@ def search_prices(
     league = league or active_pc_league()
     if (item.rarity.casefold() in {"magic", "マジック"}
             and trade_base_type and item.name == item.base_type):
+        # 日本語詳細コピーのMagic品はAffix込み英語名がname/base_typeの両方へ
+        # 入るため、検索候補を公式base typeへ正規化する。
         trade_base_type = resolve_official_base_type(trade_base_type)
     payload = build_search_query(
         item, trade_base_type, stat_filters, trade_status, trade_name, preset,

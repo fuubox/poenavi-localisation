@@ -168,6 +168,8 @@ _CATEGORY_HELP_LINES = {
 _DIRECTIONAL_STAT_ALIASES = {
     normalize_stat_text("アイテムおよびジェムの要求能力値が#%減少する"):
         "アイテムおよびジェムの要求能力値が#%増加する",
+    normalize_stat_text("持続時間が#%減少する"):
+        "持続時間が#%増加する",
 }
 _JEWEL_CATEGORIES = {"jewel", "abyss_jewel", "cluster_jewel"}
 _MAP_TIER_IN_NAME = re.compile(

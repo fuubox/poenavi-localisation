@@ -1887,6 +1887,107 @@ def test_magic_base_jewel_web_url_does_not_add_affixed_name_as_type():
     ]
 
 
+def test_current_japanese_flask_resolves_reduced_duration_and_opens_localized_trade():
+    _trade_response_cache.clear()
+    item = parse_item_text("""アイテムクラス: ユーティリティフラスコ
+レアリティ: マジック
+Abecedarian's Jade Flask of Depletion
+--------
+3.70 (augmented)秒間持続
+使用時に60中30チャージを消費
+現在0チャージ
+回避力 +1500
+--------
+装備要求:
+レベル: 27
+--------
+アイテムレベル: 42
+--------
+{ プレフィックスモッド「初学者の」 (ティア: 3) }
+持続時間が38(38-33)%減少する
+効果が25%増加する
+{ サフィックスモッド 「消費の」 (ティア: 4) — 防御, エナジーシールド, キャスター }
+効果中はスペルダメージの0.5%をエナジーシールドとしてリーチする
+""")
+    filters = resolve_trade_stat_filters(item)
+    duration = next(row for row in filters if row.stat_id == "explicit.stat_1256719186")
+    assert duration.ref == "#% increased Duration"
+    assert duration.inverted is True
+    assert unresolved_modifier_warnings(item, filters) == ()
+    ilvl = next(row for row in filters if row.stat_id == "property.item_level")
+    assert ilvl.enabled is False
+
+    response = ({"id": "qid", "result": [], "total": 0}, {})
+    with patch("src.poetore.trade._request_json", return_value=response), patch(
+        "src.poetore.trade._trade_item_entries",
+        return_value=({"type": "Jade Flask"},),
+    ), patch(
+        "src.poetore.trade._japanese_trade_item_type",
+        return_value="翡翠のフラスコ",
+    ) as localize:
+        result = search_prices(
+            item, item.base_type, "Standard",
+            stat_filters=(replace(duration, enabled=True),),
+        )
+
+    localize.assert_called_once_with("Jade Flask")
+    web_query = json.loads(parse_qs(urlsplit(result.web_url).query)["q"][0])["query"]
+    assert web_query["type"] == "翡翠のフラスコ"
+    assert web_query["stats"][0]["filters"] == [{
+        "id": "explicit.stat_1256719186",
+        "value": {"max": -38.0},
+    }]
+
+
+def test_current_japanese_tincture_opens_localized_trade_without_affixed_type():
+    _trade_response_cache.clear()
+    item = parse_item_text("""アイテムクラス: チンキ
+レアリティ: マジック
+Tenacious Blood Sap Tincture of Battering
+--------
+毎秒0.85 (augmented)のマナ燃焼を付与する
+不活性化時のクールダウン 6秒
+--------
+装備要求:
+レベル: 45
+--------
+アイテムレベル: 47
+--------
+{ プレフィックスモッド「固く握った」 (ティア: 3) }
+マナ燃焼レートが18(20-18)%減少する
+{ サフィックスモッド 「殴打の」 (ティア: 3) — ダメージ, 物理, アタック }
+近接武器は30(30-39)%の確率で敵物理ダメージ軽減を無視する
+""")
+    filters = resolve_trade_stat_filters(item)
+    mana_burn = next(row for row in filters if row.stat_id == "explicit.stat_116232170")
+    assert mana_burn.inverted is True
+    assert unresolved_modifier_warnings(item, filters) == ()
+    assert next(
+        row for row in filters if row.stat_id == "property.item_level"
+    ).enabled is False
+
+    response = ({"id": "qid", "result": [], "total": 0}, {})
+    with patch("src.poetore.trade._request_json", return_value=response), patch(
+        "src.poetore.trade._trade_item_entries",
+        return_value=({"type": "Blood Sap Tincture"},),
+    ), patch(
+        "src.poetore.trade._japanese_trade_item_type",
+        return_value="血の樹液のチンキ",
+    ) as localize:
+        result = search_prices(
+            item, item.base_type, "Standard",
+            stat_filters=(replace(mana_burn, enabled=True),),
+        )
+
+    localize.assert_called_once_with("Blood Sap Tincture")
+    web_query = json.loads(parse_qs(urlsplit(result.web_url).query)["q"][0])["query"]
+    assert web_query["type"] == "血の樹液のチンキ"
+    assert web_query["stats"][0]["filters"] == [{
+        "id": "explicit.stat_116232170",
+        "value": {"min": -19.8},
+    }]
+
+
 def test_transfigured_gem_web_url_uses_localized_base_type_with_discriminator():
     _trade_response_cache.clear()
     item = _gem_item("爆撃するクローンのミラーアロー", level=14, quality=0)
@@ -2429,7 +2530,7 @@ def test_dedicated_exact_magic_flask_keeps_t1_t2_and_crafted_only():
     assert rows["explicit.t1"].enabled is True
     assert rows["explicit.t3"].enabled is False
     assert rows["crafted.one"].enabled is True
-    assert rows["property.item_level"].enabled is True
+    assert rows["property.item_level"].enabled is False
 
 
 def test_forbidden_tome_below_83_uses_exact_area_level_range():
@@ -2681,7 +2782,7 @@ Item Level: 72
     assert next(row for row in filters if row.stat_id == "property.area_level").min_value == 78
 
 
-def test_cluster_is_dedicated_and_flask_tincture_ilvl_is_initially_enabled():
+def test_cluster_is_dedicated_and_flask_tincture_ilvl_is_initially_disabled():
     cluster = ParsedItem("Cluster Jewels", "Rare", "Test", "Large Cluster Jewel",
                          "cluster_jewel", item_level=84)
     assert uses_dedicated_exact_preset(cluster)
@@ -2693,7 +2794,7 @@ def test_cluster_is_dedicated_and_flask_tincture_ilvl_is_initially_enabled():
         with patch("src.poetore.trade._trade_stat_entries", return_value=()):
             rows = resolve_trade_stat_filters(item)
         ilvl = next(row for row in rows if row.stat_id == "property.item_level")
-        assert ilvl.enabled is True
+        assert ilvl.enabled is False
 
 
 def test_rare_jewel_mods_start_off_and_magic_affixes_start_on():

@@ -1857,7 +1857,10 @@ class PoetoreWindow(QWidget):
         # 通常・Unique・Blighted・Valdoを含むMapカテゴリ全体で非表示にする。
         has_item_level = item.item_level is not None and item.category != "map"
         self.item_level_tag.setVisible(has_item_level)
-        self._set_item_level_filter_enabled(has_item_level)
+        # Flask/Tinctureはilvlを確認・任意指定できるが、Awakened同様に初期OFF。
+        self._set_item_level_filter_enabled(
+            has_item_level and item.category not in {"flask", "tincture"}
+        )
         is_cluster = has_item_level and item.category == "cluster_jewel"
         self.item_level_range_separator.setVisible(is_cluster)
         self.item_level_max_edit.setVisible(is_cluster)

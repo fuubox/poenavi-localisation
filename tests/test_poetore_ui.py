@@ -2044,6 +2044,50 @@ def test_nonunique_jewels_use_category_search_but_cluster_and_unique_stay_exact(
         window.close()
 
 
+@pytest.mark.parametrize(("text", "expected_stat_id"), [
+    ("""アイテムクラス: ユーティリティフラスコ
+レアリティ: マジック
+Abecedarian's Jade Flask of Depletion
+--------
+アイテムレベル: 42
+--------
+{ プレフィックスモッド「初学者の」 (ティア: 3) }
+持続時間が38(38-33)%減少する
+効果が25%増加する
+{ サフィックスモッド 「消費の」 (ティア: 4) }
+効果中はスペルダメージの0.5%をエナジーシールドとしてリーチする
+""", "explicit.stat_1256719186"),
+    ("""アイテムクラス: チンキ
+レアリティ: マジック
+Tenacious Blood Sap Tincture of Battering
+--------
+アイテムレベル: 47
+--------
+{ プレフィックスモッド「固く握った」 (ティア: 3) }
+マナ燃焼レートが18(20-18)%減少する
+{ サフィックスモッド 「殴打の」 (ティア: 3) }
+近接武器は30(30-39)%の確率で敵物理ダメージ軽減を無視する
+""", "explicit.stat_116232170"),
+])
+def test_current_japanese_flask_and_tincture_have_no_unresolved_warning(
+    qapp, text, expected_stat_id,
+):
+    window = PoetoreWindow()
+    try:
+        window.input_edit.setPlainText(text)
+        window.parse_current_text()
+
+        rows = [
+            window.mod_filter_tree.topLevelItem(index).data(0, Qt.UserRole + 4)
+            for index in range(window.mod_filter_tree.topLevelItemCount())
+        ]
+        assert expected_stat_id in {row.stat_id for row in rows}
+        assert window.mod_warning.isHidden()
+        assert window.item_level_tag.property("active") is False
+    finally:
+        window.close()
+
+
 @pytest.mark.parametrize("metadata,name,expected", [
     ({}, "Fireball", "Variant：通常ジェム"),
     ({"vaal": True}, "Vaal Fireball", "Variant：ヴァールジェム"),
