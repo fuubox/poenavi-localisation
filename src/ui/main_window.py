@@ -3294,6 +3294,34 @@ class VendorSearchPresetDialog(QDialog):
             event.ignore()
 
 
+class DetachedPanelWindow(QWidget):
+    """既存パネルを本体から切り離して表示するウィンドウ。"""
+
+    def __init__(self, panel_id: str, title: str, content: QWidget, return_callback):
+        super().__init__(None)
+        self.panel_id = panel_id
+        self.content = content
+        self._return_callback = return_callback
+        self._returning = False
+        self.setWindowTitle(title)
+        self.resize(max(320, content.width()), max(180, content.height()))
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(8, 8, 8, 8)
+        return_button = QPushButton("↙ 本体へ戻す")
+        return_button.clicked.connect(self.return_to_main)
+        layout.addWidget(return_button, alignment=Qt.AlignRight)
+        layout.addWidget(content)
+
+    def return_to_main(self):
+        self._return_callback(self.panel_id)
+
+    def closeEvent(self, event):
+        if not self._returning:
+            self._return_callback(self.panel_id)
+        event.accept()
+
+
 class MainWindow(QMainWindow):
     # Qt may call an overridden showEvent from QMainWindow.__init__ before
     # this class' __init__ body can initialize instance attributes.
@@ -3311,6 +3339,76 @@ class MainWindow(QMainWindow):
     hotkey_signal = Signal(str)
     poelab_url_resolved = Signal(str)
     poelab_url_failed = Signal(str)
+
+    def _detached_panel_config(self, panel_id: str) -> dict:
+        panels = self.config.setdefault("detached_panels", {})
+        return panels.setdefault(panel_id, {"detached": False})
+
+    def _save_detached_panel_state(self, panel_id: str):
+        state = self._detached_panel_config(panel_id)
+        panel_window = getattr(self, "detached_panel_windows", {}).get(panel_id)
+        state["detached"] = panel_window is not None
+        if panel_window is not None:
+            geometry = panel_window.geometry()
+            state.update({
+                "x": geometry.x(), "y": geometry.y(),
+                "width": geometry.width(), "height": geometry.height(),
+            })
+        ConfigManager.save_config(self.config)
+
+    def detach_panel(self, panel_id: str):
+        if panel_id in self.detached_panel_windows:
+            return
+        record = self.panel_registry[panel_id]
+        content = record["content"]
+        record["layout"].removeWidget(content)
+        panel_window = DetachedPanelWindow(panel_id, record["title"], content, self.restore_panel)
+        self.detached_panel_windows[panel_id] = panel_window
+        panel_window.show()
+        self._save_detached_panel_state(panel_id)
+
+    def restore_panel(self, panel_id: str):
+        panel_window = self.detached_panel_windows.pop(panel_id, None)
+        if panel_window is None:
+            return
+        record = self.panel_registry[panel_id]
+        panel_window.layout().removeWidget(record["content"])
+        record["layout"].insertWidget(record["index"], record["content"])
+        panel_window._returning = True
+        panel_window.close()
+        panel_window.deleteLater()
+        self._save_detached_panel_state(panel_id)
+
+    def _register_detachable_panel(self, panel_id: str, title: str, widgets: list[QWidget], layout):
+        """既存レイアウト内の連続したUIを、移動可能な一つのパネルにまとめる。"""
+        index = layout.indexOf(widgets[0])
+        panel = QWidget()
+        panel_layout = QVBoxLayout(panel)
+        panel_layout.setContentsMargins(0, 0, 0, 0)
+        panel_layout.setSpacing(0)
+        detach_button = QPushButton("↗ 切り離す")
+        detach_button.setStyleSheet(Styles.BUTTON)
+        detach_button.clicked.connect(lambda: self.detach_panel(panel_id))
+        panel_layout.addWidget(detach_button, alignment=Qt.AlignRight)
+        for widget in widgets:
+            layout.removeWidget(widget)
+            panel_layout.addWidget(widget)
+        layout.insertWidget(index, panel)
+        self.panel_registry[panel_id] = {
+            "content": panel, "host": panel.parentWidget(), "layout": layout,
+            "index": index, "title": title,
+        }
+
+    def _restore_detached_panels(self):
+        for panel_id in tuple(self.panel_registry):
+            state = self._detached_panel_config(panel_id)
+            if not state.get("detached", False):
+                continue
+            self.detach_panel(panel_id)
+            panel_window = self.detached_panel_windows[panel_id]
+            width, height = state.get("width", 0), state.get("height", 0)
+            if isinstance(width, int) and width >= 320 and isinstance(height, int) and height >= 180:
+                panel_window.setGeometry(state.get("x", 0), state.get("y", 0), width, height)
 
     def __init__(self):
         super().__init__()
@@ -3454,7 +3552,10 @@ class MainWindow(QMainWindow):
         self.gem_tracker_popup = None
         self._last_search_target_hwnd = None
         
+        self.panel_registry = {}
+        self.detached_panel_windows = {}
         self.setup_ui()
+        self._restore_detached_panels()
         self.map_thumbnail.auto_open = self.config.get("auto_open_map", False)
         self.map_thumbnail.auto_position = self.config.get("auto_position_map", True)
         self.setMouseTracking(True)
@@ -4550,6 +4651,7 @@ class MainWindow(QMainWindow):
 
         self.guide_lower_widget = QWidget()
         guide_lower_layout = QVBoxLayout(self.guide_lower_widget)
+        self.guide_lower_layout = guide_lower_layout
         guide_lower_layout.setContentsMargins(0, 0, 0, 0)
         guide_lower_layout.setSpacing(5)
         self.guide_body_splitter.addWidget(self.guide_lower_widget)
@@ -4682,7 +4784,17 @@ class MainWindow(QMainWindow):
             QTimer.singleShot(0, lambda sizes=saved_splitter_sizes: self.guide_body_splitter.setSizes(sizes))
         
         layout.addWidget(self.guide_container, stretch=1)
-        
+
+        self._register_detachable_panel(
+            "timer", "タイマー", [self.timer_toggle_btn, self.timer_container], layout,
+        )
+        self._register_detachable_panel(
+            "guide", "ガイド", [self.guide_toggle_btn, self.guide_container], layout,
+        )
+        self._register_detachable_panel(
+            "map", "マップ", [self.map_toggle_btn, self.map_thumbnail], self.guide_lower_layout,
+        )
+
         # 初期状態の反映
         self._apply_guide_visibility()
 
@@ -6991,6 +7103,11 @@ class MainWindow(QMainWindow):
         self.move(x, y)
 
     def closeEvent(self, event):
+        for panel_id, panel_window in list(getattr(self, "detached_panel_windows", {}).items()):
+            self._save_detached_panel_state(panel_id)
+            panel_window._returning = True
+            panel_window.close()
+
         # 起動時アップデートでは、保存済みジオメトリを復元する前の仮サイズ
         # (420x1200) のまま終了する。初期化・初期配置が完了した通常終了時だけ
         # 位置とサイズを保存し、ユーザー設定を仮サイズで上書きしない。
