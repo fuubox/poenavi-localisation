@@ -58,6 +58,7 @@ _MOD_COLUMN_TEXT = 3
 _MOD_COLUMN_MIN = 4
 _MOD_COLUMN_MAX = 5
 _MOD_COLUMN_DETAILS = 6
+_MOD_TIER_COLUMN_WIDTH = 94
 
 _FILTER_KIND_LABELS = {
     "explicit": "明示",
@@ -886,7 +887,8 @@ class PoetoreWindow(QWidget):
         mod_header = self.mod_filter_tree.header()
         mod_header.setSectionResizeMode(_MOD_COLUMN_CHECK, QHeaderView.ResizeToContents)
         mod_header.setSectionResizeMode(_MOD_COLUMN_KIND, QHeaderView.ResizeToContents)
-        mod_header.setSectionResizeMode(_MOD_COLUMN_TIER, QHeaderView.ResizeToContents)
+        mod_header.setSectionResizeMode(_MOD_COLUMN_TIER, QHeaderView.Fixed)
+        self.mod_filter_tree.setColumnWidth(_MOD_COLUMN_TIER, _MOD_TIER_COLUMN_WIDTH)
         mod_header.setSectionResizeMode(_MOD_COLUMN_TEXT, QHeaderView.Stretch)
         mod_header.setSectionResizeMode(_MOD_COLUMN_MIN, QHeaderView.ResizeToContents)
         mod_header.setSectionResizeMode(_MOD_COLUMN_MAX, QHeaderView.ResizeToContents)
@@ -2395,7 +2397,7 @@ class PoetoreWindow(QWidget):
                 tier_text = f"T{stat_filter.tier}"
             row = QTreeWidgetItem([
                 "", _filter_kind_label(stat_filter),
-                tier_text,
+                "" if tier_tags else tier_text,
                 stat_filter.text, "", "", summary,
             ])
             row.setData(0, Qt.UserRole, stat_filter.stat_id)

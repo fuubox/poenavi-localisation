@@ -441,12 +441,66 @@ def test_mod_filter_ui_shows_multiple_awakened_tier_tags_on_property(qapp):
         window._populate_stat_filters((source,))
         row = window.mod_filter_tree.topLevelItem(0)
         assert row.text(1) == "アイテム特性"
-        assert row.text(2) == "T1 / T2"
+        assert row.text(2) == ""
         tier_widget = window.mod_filter_tree.itemWidget(row, 2)
         assert tier_widget is not None
         assert [label.text() for label in tier_widget.findChildren(QLabel)] == ["T1", "T2"]
         selected = window._selected_stat_filters()[0]
         assert selected.tier_tags == (1, 2)
+    finally:
+        window.close()
+
+
+def test_weapon_compound_accuracy_tier_badge_has_double_width_column(qapp):
+    window = PoetoreWindow()
+    try:
+        window.input_edit.setPlainText("""アイテムクラス: ワンド
+レアリティ: レア
+Corruption Call
+Imbued Wand
+--------
+ワンド
+品質: +26% (augmented)
+物理ダメージ: 59-108 (augmented)
+クリティカル率: 8.00%
+秒間アタック回数: 1.73 (augmented)
+--------
+装備要求:
+レベル: 60
+知性: 188
+--------
+ソケット: B
+--------
+アイテムレベル: 83
+--------
+{ 暗黙モッド — ダメージ, キャスター }
+スペルダメージが35(33-37)%増加する
+--------
+{ プレフィックスモッド「皇帝の」 (ティア: 2) — ダメージ, 物理, アタック }
+物理ダメージが72(65-74)%増加する
+命中力 +155(150-174)
+{ サフィックスモッド 「容易さの」 (ティア: 4) — アタック, スピード }
+アタックスピードが8(8-10)%増加する
+{ サフィックスモッド 「消し炭の」 (ティア: 4) — ダメージ, 元素, 火 }
+火ダメージが17(16-18)%増加する
+{ サフィックスモッド 「レンジャーの」 (ティア: 2) — アタック }
+命中力 +554(456-624)""")
+        window.parse_current_text()
+        window.show()
+        qapp.processEvents()
+
+        accuracy_row = next(
+            window.mod_filter_tree.topLevelItem(index)
+            for index in range(window.mod_filter_tree.topLevelItemCount())
+            if "命中力 +155" in window.mod_filter_tree.topLevelItem(index).text(3)
+        )
+        tier_widget = window.mod_filter_tree.itemWidget(accuracy_row, 2)
+
+        assert window.mod_filter_tree.columnWidth(2) == 94
+        assert accuracy_row.text(2) == ""
+        assert tier_widget is not None
+        assert [label.text() for label in tier_widget.findChildren(QLabel)] == ["T2"]
+        assert tier_widget.sizeHint().width() <= window.mod_filter_tree.columnWidth(2)
     finally:
         window.close()
 
