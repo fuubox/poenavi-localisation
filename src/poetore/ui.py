@@ -1778,7 +1778,11 @@ class PoetoreWindow(QWidget):
         )
         self.magic_rarity_toggle.setVisible(show)
         if show:
-            self.magic_rarity_toggle.setCurrentIndex(0)
+            # AwakenedはAdorned用途のMagic Jewel／Abyss Jewelだけ、
+            # Exact（ベース）検索でもrarityをMagic完全一致にする。
+            self.magic_rarity_toggle.setCurrentIndex(
+                1 if item.category in {"jewel", "abyss_jewel"} else 0
+            )
 
     def _configure_trade_currency(self, item):
         """同じ参照アイテムでは選択を保持し、新しい種類では推奨値へ戻す。"""

@@ -869,6 +869,26 @@ Item Level: 85
         window.close()
 
 
+def test_magic_jewel_base_search_defaults_to_magic_exact_like_awakened(qapp):
+    window = PoetoreWindow()
+    try:
+        item = parse_item_text("""Item Class: Jewels
+Rarity: Magic
+Vicious Viridian Jewel of Shelter
+Viridian Jewel
+--------
+Item Level: 82
+""")
+        assert item.category == "jewel"
+        window._parsed_item = item
+        window._configure_trade_presets(item)
+        window.trade_preset_combo.setCurrentIndex(1)
+        assert not window.magic_rarity_toggle.isHidden()
+        assert window.magic_rarity_toggle.currentData() is True
+    finally:
+        window.close()
+
+
 def test_currency_selection_uses_recommended_default_and_is_kept_for_same_item(qapp):
     window = PoetoreWindow()
     try:
