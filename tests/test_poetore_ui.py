@@ -1643,9 +1643,9 @@ def test_windows_acceptance_csv_has_complete_ordered_cases():
     path = Path("docs/poetore-windows-acceptance-tests.csv")
     with path.open(encoding="utf-8-sig", newline="") as handle:
         rows = list(csv.DictReader(handle))
-    assert len(rows) == 41
+    assert len(rows) == 42
     assert len({row["ID"] for row in rows}) == len(rows)
-    assert rows[-1]["ID"] == "WIN-046"
+    assert rows[-1]["ID"] == "WIN-047"
     required = {"ID", "区分", "優先度", "前提条件", "テストデータ", "手順", "期待結果", "結果", "証跡", "備考"}
     assert set(rows[0]) == required
     assert all(row["手順"] and row["期待結果"] for row in rows)

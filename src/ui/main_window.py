@@ -9,7 +9,7 @@ from PySide6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
                                QLabel, QPushButton, QMenu, QFrame, QScrollArea, QSplitter,
                                QSizeGrip, QSizePolicy, QMessageBox, QRadioButton, QButtonGroup, QApplication)
 from PySide6.QtCore import Qt, QTimer, Signal, QRect, QEvent, QEventLoop, QPoint, QSize, QMimeData, QUrl
-from PySide6.QtGui import QCursor, QMouseEvent, QIcon, QDesktopServices
+from PySide6.QtGui import QCursor, QMouseEvent, QIcon, QDesktopServices, QKeySequence
 from src.ui.styles import Styles
 from src.ui.detached_panel import DetachedPanelWindow
 from src.ui.settings_dialog import AreaNoteDialog, SettingsDialog
@@ -4438,7 +4438,7 @@ class MainWindow(QMainWindow):
         self.poetore_btn = QPushButton("💰")
         self.poetore_btn.setStyleSheet(Styles.BUTTON)
         self.poetore_btn.setFixedSize(35, 35)
-        self.poetore_btn.setToolTip("ぽえとれ（Alt+Dで日本語名＋詳細Modを取得）")
+        self._update_poetore_hotkey_tooltip()
         self.poetore_btn.clicked.connect(self.open_poetore)
         global_controls_layout.addWidget(self.poetore_btn)
         
@@ -7170,11 +7170,21 @@ class MainWindow(QMainWindow):
         show_poetore_window(self)
 
     def capture_poetore_item(self):
-        """Alt+Dからぽえとれを開き、PoE上のアイテムを自動取得する。"""
+        """設定済みホットキーからぽえとれを開き、PoE上のアイテムを自動取得する。"""
         from src.poetore.ui import show_poetore_window
 
         # コピーが終わるまでPoEからフォーカスを奪わない。
         show_poetore_window(self, activate=False).capture_from_poe()
+
+    def _update_poetore_hotkey_tooltip(self):
+        hotkey = self.config.get("hotkeys", {}).get("poetore_capture", "alt+d")
+        if hotkey and hotkey != "none":
+            display_hotkey = QKeySequence(hotkey).toString(QKeySequence.NativeText)
+            self.poetore_btn.setToolTip(
+                f"ぽえとれ（{display_hotkey}で日本語名＋詳細Modを取得）"
+            )
+        else:
+            self.poetore_btn.setToolTip("ぽえとれ（ホットキー未設定）")
     
     def open_settings(self):
         dialog = SettingsDialog(self, self.config)
@@ -7192,6 +7202,7 @@ class MainWindow(QMainWindow):
             # ホットキー再登録
             self.register_hotkeys()
             self._update_click_through_label()
+            self._update_poetore_hotkey_tooltip()
             
             # ログ監視の再設定
             active_version = self.config.get("poe_version", self.poe_version)

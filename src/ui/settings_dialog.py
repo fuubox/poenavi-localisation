@@ -1470,7 +1470,8 @@ class SettingsDialog(QDialog):
             "logout": "F5",
             "hideout": "F11",
             "monastery": "F12",
-            "search_string_test": "none"
+            "search_string_test": "none",
+            "poetore_capture": "alt+d",
         })
         self.poe_version = self.current_config.get("poe_version", POE1)
         self.poe_version_mode = self.current_config.get("poe_version_mode", "ask")
@@ -1660,6 +1661,14 @@ class SettingsDialog(QDialog):
         self.search_string_test_btn = HotkeyButton(self.hotkeys.get("search_string_test", "none"))
         h_layout9.addWidget(self.search_string_test_btn)
         group_layout.addLayout(h_layout9)
+
+        h_layout10 = QHBoxLayout()
+        h_layout10.addWidget(QLabel("ぽえとれ検索:"))
+        self.poetore_capture_btn = HotkeyButton(
+            self.hotkeys.get("poetore_capture", "alt+d")
+        )
+        h_layout10.addWidget(self.poetore_capture_btn)
+        group_layout.addLayout(h_layout10)
         
         self.logout_enabled_cb = QCheckBox("ログアウト機能を有効にする（TCP切断）")
         self.logout_enabled_cb.setChecked(self.current_config.get("logout_enabled", True))
@@ -2701,6 +2710,7 @@ class SettingsDialog(QDialog):
                 "hideout": self.hideout_btn.key_text,
                 "monastery": self.monastery_btn.key_text,
                 "search_string_test": self.search_string_test_btn.key_text,
+                "poetore_capture": self.poetore_capture_btn.key_text,
             },
             "logout_enabled": self.logout_enabled_cb.isChecked(),
             "client_log_paths": {
