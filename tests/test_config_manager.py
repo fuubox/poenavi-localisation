@@ -43,6 +43,39 @@ def write_default_config(app_dir: Path, overrides=None):
 
 
 class ConfigManagerTest(unittest.TestCase):
+    def test_schema_v4_adds_standard_mode_to_localized_schema_v3_config(self):
+        migrated = ConfigManager._migrate_config({
+            "schemaVersion": 3,
+            "mini_guide_overlay": {
+                "position": {"x": 30, "y": 40},
+                "width": 800,
+                "height": 130,
+                "font_size": 18,
+            },
+        })
+
+        self.assertEqual(migrated["schemaVersion"], 4)
+        self.assertEqual(migrated["mini_guide_overlay"]["display_mode"], "standard")
+        self.assertEqual(migrated["mini_guide_overlay"]["position"], {"x": 30, "y": 40})
+        self.assertEqual(migrated["mini_guide_overlay"]["width"], 800)
+        self.assertEqual(migrated["mini_guide_overlay"]["height"], 130)
+
+    def test_schema_v4_adds_standard_mode_without_changing_existing_geometry(self):
+        migrated = ConfigManager._migrate_config({
+            "schemaVersion": 2,
+            "mini_guide_overlay": {
+                "position": {"x": 30, "y": 40},
+                "width": 795,
+                "height": 126,
+            },
+        })
+
+        self.assertEqual(migrated["schemaVersion"], ConfigManager.CURRENT_SCHEMA_VERSION)
+        self.assertEqual(migrated["mini_guide_overlay"]["display_mode"], "standard")
+        self.assertEqual(migrated["mini_guide_overlay"]["position"], {"x": 30, "y": 40})
+        self.assertEqual(migrated["mini_guide_overlay"]["width"], 795)
+        self.assertEqual(migrated["mini_guide_overlay"]["height"], 126)
+
     def test_schema_v3_migrates_only_old_mini_navi_defaults(self):
         migrated = ConfigManager._migrate_config({
             "schemaVersion": 1,
@@ -53,7 +86,7 @@ class ConfigManagerTest(unittest.TestCase):
             },
         })
 
-        self.assertEqual(migrated["schemaVersion"], 3)
+        self.assertEqual(migrated["schemaVersion"], ConfigManager.CURRENT_SCHEMA_VERSION)
         self.assertEqual(migrated["mini_guide_overlay"]["width"], 800)
         self.assertEqual(migrated["mini_guide_overlay"]["height"], 130)
         self.assertEqual(migrated["mini_guide_overlay"]["font_size"], 18)
@@ -132,7 +165,7 @@ class ConfigManagerTest(unittest.TestCase):
             self.assertEqual(loaded["mini_guide_overlay"]["height"], 130)
             self.assertEqual(loaded["mini_guide_overlay"]["font_size"], 18)
             self.assertEqual(persisted["mini_guide_overlay"], loaded["mini_guide_overlay"])
-            self.assertEqual(persisted["schemaVersion"], 3)
+            self.assertEqual(persisted["schemaVersion"], ConfigManager.CURRENT_SCHEMA_VERSION)
 
     def test_save_and_load_uses_user_data_dir_override(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -452,6 +485,22 @@ class ConfigManagerTest(unittest.TestCase):
                 self.assertTrue(loaded["poe1_route_selected"])
                 self.assertEqual(ConfigManager.effective_poe1_route_act3(loaded), "standard")
                 self.assertEqual(ConfigManager.effective_poe1_route_act8(loaded), "standard")
+
+    def test_save_config_skips_unchanged_content(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            app_dir = Path(tmp) / "app"
+            user_dir = Path(tmp) / "user-data"
+            app_dir.mkdir()
+            user_dir.mkdir()
+            write_default_config(app_dir)
+
+            with patch.dict(os.environ, {ConfigManager.ENV_USER_DATA_DIR: str(user_dir)}), \
+                 patch.object(ConfigManager, "get_app_dir", return_value=app_dir):
+                config = ConfigManager.load_config()
+                with patch.object(ConfigManager, "_write_json", wraps=ConfigManager._write_json) as write_json:
+                    ConfigManager.save_config(config)
+
+            write_json.assert_not_called()
 
 
 if __name__ == "__main__":

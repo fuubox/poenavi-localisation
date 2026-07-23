@@ -15,7 +15,7 @@ class ConfigManager:
     DEFAULT_CONFIG_FILE = "default_config.json"
     APP_NAME = "PoENavi"
     ENV_USER_DATA_DIR = "POENAVI_USER_DATA_DIR"
-    CURRENT_SCHEMA_VERSION = 3
+    CURRENT_SCHEMA_VERSION = 4
     POE1_ROUTE_ACT3_DEFAULT = "library_detour"
     POE1_ROUTE_ACT8_DEFAULT = "standard"
     POE1_ROUTE_ACT3_OLD_DEFAULT = "library_detour"
@@ -392,6 +392,11 @@ class ConfigManager:
                 if mini_navi.get("font_size") in (15, 16):
                     mini_navi["font_size"] = 18
 
+        if schema_version < 4:
+            mini_navi = migrated.get("mini_guide_overlay")
+            if isinstance(mini_navi, dict):
+                mini_navi.setdefault("display_mode", "standard")
+
         if "poe1_route_selected" not in migrated:
             migrated["poe1_route_selected"] = cls._infer_poe1_route_selected(config)
 
@@ -443,6 +448,10 @@ class ConfigManager:
 
         default_config = cls._load_default_config_template()
         migrated = cls._migrate_config(cls._deep_merge(default_config, raw_config))
+        if isinstance(raw_config, dict) and "area_note_migration_notice_shown" not in raw_config:
+            # この案内は旧版利用者向け。新規設定ではdefault_configのtrueを使い、
+            # 既存configにキーが無い場合だけ一度表示する。
+            migrated["area_note_migration_notice_shown"] = False
         if isinstance(raw_config, dict) and "poe1_route_selected" not in raw_config:
             migrated["poe1_route_selected"] = cls._infer_poe1_route_selected(raw_config)
         return migrated
@@ -512,4 +521,11 @@ class ConfigManager:
         default_config = cls._load_default_config_template()
         config = cls._migrate_config(cls._deep_merge(default_config, config))
         config = cls.migrate_pob_import_data_from_config(config)
-        cls._write_json(cls._get_config_path(), config)
+        config_path = Path(cls._get_config_path())
+        if config_path.exists():
+            try:
+                if cls._read_json(config_path) == config:
+                    return
+            except Exception:
+                pass
+        cls._write_json(config_path, config)

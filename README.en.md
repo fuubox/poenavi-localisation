@@ -130,6 +130,15 @@ Act transitions, Act 1-5 / Act 6-10 mode selection, and saved timer state. The
 default controls are F1-F6, F11, and F12 as listed above; every hotkey can be
 changed in Settings.
 
+For PoE 1, pressing `Ready` with a reset timer waits for the new character to
+enter **The Twilight Strand**, then starts the timer automatically when that
+entry appears in `Client.txt`. While Ready is active, the log polling interval
+temporarily changes to 100 ms and returns to normal after the timer starts.
+Press `Ready` again to cancel; Ready state is not retained across restarts.
+Reset any existing timer data before enabling Ready. Manual Start remains
+available. Path of Exile must have **Local** chat logging enabled for the area
+entry to be detected.
+
 ![RTA timer](docs/screenshot6.png)
 
 ### Gem tracking and search

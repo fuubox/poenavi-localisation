@@ -4,6 +4,7 @@ import pytest
 from PySide6.QtWidgets import QApplication, QMainWindow
 
 from src.ui.main_window import MainWindow
+from src.utils.config_manager import ConfigManager
 
 
 @pytest.fixture(scope="module")
@@ -51,3 +52,22 @@ def test_area_note_migration_notice_is_not_shown_again(qapp):
 
     message_box.assert_not_called()
     save_config.assert_not_called()
+
+
+def test_new_install_defaults_to_notice_already_shown(tmp_path, monkeypatch):
+    monkeypatch.setenv(ConfigManager.ENV_USER_DATA_DIR, str(tmp_path / "user-data"))
+
+    config = ConfigManager.load_config()
+
+    assert config["area_note_migration_notice_shown"] is True
+
+
+def test_existing_config_without_notice_flag_is_marked_for_one_time_notice(tmp_path, monkeypatch):
+    user_data = tmp_path / "user-data"
+    user_data.mkdir()
+    (user_data / "config.json").write_text('{"setup_completed": true}', encoding="utf-8")
+    monkeypatch.setenv(ConfigManager.ENV_USER_DATA_DIR, str(user_data))
+
+    config = ConfigManager.load_config()
+
+    assert config["area_note_migration_notice_shown"] is False

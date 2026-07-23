@@ -1,5 +1,5 @@
 {
-    "schemaVersion": 3,
+    "schemaVersion": 4,
     "language": "ja",
     "language_selected": false,
     "hotkeys": {
@@ -20,6 +20,7 @@
     "guide_font_size": 18,
     "guide_detail_level": "beginner",
     "guide_detail_level_selected": false,
+    "area_note_migration_notice_shown": true,
     "part2_mode": false,
     "timer_expanded": true,
     "map_viewer_width": 711,
@@ -47,6 +48,7 @@
         "height": 867
     },
     "snap_to_right_edge": false,
+    "detached_panels": {},
     "gem_tracker_expanded": true,
     "client_log_paths": {
         "poe1": "",
@@ -55,6 +57,7 @@
     "poe1_route_selected": false,
     "mini_guide_overlay": {
         "enabled": false,
+        "display_mode": "standard",
         "locked": true,
         "click_through_when_locked": true,
         "opacity": 0.72,

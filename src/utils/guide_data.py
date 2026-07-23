@@ -28,6 +28,8 @@ DEFAULT_GUIDE = {
     },
 }
 
+_GUIDE_DATA_CACHE: dict[str, tuple[int, dict]] = {}
+
 def get_guide_dir():
     """ガイドデータファイルのディレクトリ（exeフォルダ優先 → _MEIPASS）"""
     if getattr(sys, 'frozen', False):
@@ -52,23 +54,30 @@ def get_guide_path(poe_version: str = POE1, language: str = DEFAULT_LOCALE) -> s
 
 def load_guide_data(poe_version: str = POE1, language: str = DEFAULT_LOCALE) -> dict:
     """ガイドデータを読み込み"""
-    path = get_guide_path(poe_version, language)
-    if os.path.exists(path):
+    requested_path = get_guide_path(poe_version, language)
+    paths = [requested_path]
+    if str(language).lower().replace("_", "-").startswith("en"):
+        fallback_path = get_guide_path(poe_version, DEFAULT_LOCALE)
+        if fallback_path != requested_path:
+            paths.append(fallback_path)
+
+    for path in paths:
+        try:
+            modified_ns = os.stat(path).st_mtime_ns
+        except OSError:
+            continue
+
+        cached = _GUIDE_DATA_CACHE.get(path)
+        if cached and cached[0] == modified_ns:
+            return cached[1]
+
         try:
             with open(path, "r", encoding="utf-8") as f:
-                return json.load(f)
+                data = json.load(f)
+            _GUIDE_DATA_CACHE[path] = (modified_ns, data)
+            return data
         except Exception as e:
             print(f"[GuideData] Failed to load ({poe_version}): {e}")
-    # A missing English file is a safe read fallback; saving still targets the
-    # requested locale-specific path so editor writes remain isolated.
-    if str(language).lower().replace("_", "-").startswith("en"):
-        fallback = get_guide_path(poe_version, DEFAULT_LOCALE)
-        if os.path.exists(fallback):
-            try:
-                with open(fallback, "r", encoding="utf-8") as f:
-                    return json.load(f)
-            except Exception:
-                pass
     return DEFAULT_GUIDE if poe_version == POE1 else {}
 
 
@@ -90,6 +99,7 @@ def save_guide_data(data: dict, poe_version: str = POE1, language: str = DEFAULT
             print(f"[GuideData] Backup: {backup_path}")
         with open(path, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
+        _GUIDE_DATA_CACHE.pop(path, None)
         print(f"[GuideData] Saved ({poe_version}): {path}")
     except Exception as e:
         print(f"[GuideData] Failed to save ({poe_version}): {e}")
@@ -204,7 +214,7 @@ def _entry_has_display_content(entry: dict) -> bool:
     return False
 
 
-def get_mini_navi_content(guide: dict | None, max_lines: int = 4) -> dict | None:
+def get_mini_navi_content(guide: dict | None, max_lines: int | None = 4) -> dict | None:
     """みになび表示用の短文を取得する。
 
     優先順:
@@ -216,7 +226,6 @@ def get_mini_navi_content(guide: dict | None, max_lines: int = 4) -> dict | None
     if not isinstance(guide, dict):
         return None
 
-    max_lines = max(4, min(int(max_lines or 4), 6))
     mini_navi = guide.get("mini_navi")
     direction = guide.get("direction", "none") or "none"
     raw_lines: list[str] = []
@@ -245,6 +254,10 @@ def get_mini_navi_content(guide: dict | None, max_lines: int = 4) -> dict | None
     if not lines:
         return None
 
+    if max_lines is None:
+        return {"text": "\n".join(lines), "direction": direction}
+
+    max_lines = max(4, min(int(max_lines or 4), 6))
     clipped = lines[:max_lines]
     if len(lines) > max_lines and clipped:
         clipped[-1] = clipped[-1].rstrip("…") + "…"
