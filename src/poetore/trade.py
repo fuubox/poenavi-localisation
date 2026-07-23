@@ -1937,6 +1937,9 @@ def resolve_trade_stat_filters(
             group_min=stat_filter.group_min,
         )
     enable_unique_rolls = unique_item and len(combined) <= 3
+    # AwakenedはFoulborn品について、置換されたFoulborn Modだけでなく、
+    # 置換されずに残った通常Unique Modも個体差として初期選択する。
+    enable_foulborn_rolls = unique_item and "foulborn" in item.flags
     # ユニーク品はpseudo集約を表示しないため、元の可変Modを消費扱いにしない。
     # 非ユニーク品だけ、pseudoと個別Modの二重表示を避ける。
     consumed_stat_ids = (
@@ -1951,7 +1954,8 @@ def resolve_trade_stat_filters(
         TradeStatFilter(
             row.stat_id,
             f"{row.text} ({counts[combine_key]}行合計)" if counts[combine_key] > 1 else row.text,
-            row.min_value, row.kind, enable_unique_rolls or row.enabled,
+            row.min_value, row.kind,
+            enable_unique_rolls or enable_foulborn_rolls or row.enabled,
             row.max_value, row.ref, row.confidence, row.inverted,
             option_value=row.option_value, option_text=row.option_text, oils=row.oils,
             selection_reason=row.selection_reason,

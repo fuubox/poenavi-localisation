@@ -1525,16 +1525,19 @@ Iron Ring
 グローバル防御力が16(10-30)%増加する
 """)
     filters = resolve_trade_stat_filters(item)
+    assert item.name == "Le Heup of All"
     assert {row.stat_id for row in filters} >= {
         "explicit.stat_1379411836",
         "explicit.stat_2901986750",
         "explicit.stat_3917489142",
         "explicit.stat_1389153006",
     }
+    assert all(row.enabled for row in filters)
     query = build_search_query(
-        item, "Iron Ring", trade_name="Le Heup of All",
+        item, "Iron Ring", trade_name=item.name,
         stat_filters=filters,
     )["query"]
+    assert query["name"] == "Le Heup of All"
     assert "foulborn_item" not in query["filters"]["misc_filters"]["filters"]
 
 

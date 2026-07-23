@@ -117,6 +117,10 @@ _UNSCALABLE_VALUE_SUFFIX = re.compile(
     re.IGNORECASE,
 )
 _MUTATED_SUFFIX = re.compile(r"\s*[（(]mutated[）)]\s*$", re.IGNORECASE)
+_FOULBORN_NAME_PREFIX = re.compile(
+    r"^(?:Foulborn|ファウルボーン)\s+(.+)$",
+    re.IGNORECASE,
+)
 _GLOSSARY_HELP_LINE = re.compile(
     r"^[（(]\s*[^()（）:：\r\n]{1,80}\s*[:：].*[）)]$",
 )
@@ -612,6 +616,12 @@ def parse_item_text(text: str) -> ParsedItem:
         or "Foulborn Unique Mod" in text
     ):
         flags.append("foulborn")
+        # Awakenedと同様、Foulbornはユニーク名そのものではなく状態として扱う。
+        # Trade APIには通常のユニーク名を送り、Foulborn Modで個体を絞る。
+        if rarity.casefold() in {"unique", "ユニーク"} and "unidentified" not in flags:
+            foulborn_name = _FOULBORN_NAME_PREFIX.fullmatch(name.strip())
+            if foulborn_name:
+                name = foulborn_name.group(1).strip()
 
     return ParsedItem(
         item_class=header.get("item_class", ""), rarity=rarity, name=name,

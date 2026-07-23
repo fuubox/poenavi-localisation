@@ -205,6 +205,43 @@ def test_filter_kind_column_is_japanese_and_marks_foulborn_generation(qapp):
         window.close()
 
 
+def test_foulborn_unique_uses_normal_name_and_enables_variable_mods_in_real_panel(qapp):
+    window = PoetoreWindow()
+    try:
+        window._trade_base_type = "Iron Ring"
+        window._trade_item_name = "Le Heup of All"
+        window.input_edit.setPlainText("""アイテムクラス: 指輪
+レアリティ: ユニーク
+ファウルボーン 皆を繋ぐもの
+鉄の指輪
+--------
+アイテムレベル: 83
+--------
+{ ユニークモッド — 能力値 }
+全ての能力値 +22(10-30)
+{ ユニークモッド — 元素, 耐性 }
+全ての元素耐性 +29(10-30)%
+{ ユニークモッド — ドロップ }
+見つかるアイテムのレアリティが16(10-30)%増加する
+{ ファウルボーンユニークモッド — 防御 }
+グローバル防御力が16(10-30)%増加する
+""")
+        window.parse_current_text()
+
+        assert window._parsed_item.name == "皆を繋ぐもの"
+        assert window.item_name_label.text() == "皆を繋ぐもの"
+        assert window.mod_filter_tree.topLevelItemCount() == 4
+        assert all(
+            window.mod_filter_tree.itemWidget(
+                window.mod_filter_tree.topLevelItem(index), 0
+            ).findChild(QCheckBox, "modFilterCheckbox").isChecked()
+            for index in range(4)
+        )
+        assert "foulborn" not in {name for name, _chip in window._filter_chips}
+    finally:
+        window.close()
+
+
 def test_poetore_uses_wide_poena_theme_and_hides_debug_parse_area(qapp):
     window = PoetoreWindow()
     try:

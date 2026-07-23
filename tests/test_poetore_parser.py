@@ -365,6 +365,7 @@ Iron Ring
 (アーマー、回避力、エナジーシールドは標準的な防御力である)
 """)
         self.assertIn("foulborn", item.flags)
+        self.assertEqual(item.name, "Le Heup of All")
         self.assertEqual(
             [modifier.kind for modifier in item.modifiers],
             ["implicit", "explicit", "explicit", "explicit", "explicit"],
