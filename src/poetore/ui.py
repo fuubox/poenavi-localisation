@@ -2551,6 +2551,10 @@ class PoetoreWindow(QWidget):
         if show_quality:
             columns.append("品質")
         columns.append("出品日時")
+        # QTreeWidget#setHeaderLabels()は既存より列数が少ない場合に、
+        # 余った末尾列を削除しない。Gem→武器などで固有列が減る時は
+        # 先に列数を確定し、前カテゴリのヘッダーを残さない。
+        self.price_list.setColumnCount(len(columns))
         self.price_list.setHeaderLabels(columns)
         header = self.price_list.header()
         for column in range(len(columns)):

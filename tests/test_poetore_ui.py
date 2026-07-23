@@ -400,6 +400,54 @@ def test_japanese_trade_url_button_opens_result_url(qapp):
         window.close()
 
 
+def test_price_result_columns_reset_when_switching_from_gem_to_weapon(qapp):
+    window = PoetoreWindow()
+    try:
+        gem = parse_item_text("""アイテムクラス: スキルジェム
+レアリティ: ジェム
+Arc
+--------
+レベル: 20
+品質: +20%
+""")
+        window._parsed_item = gem
+        gem_listing = PriceListing(
+            1, "chaos", "", "Arc", "Arc",
+            "2026-07-23T12:00:00Z", 1, 20, 20, None,
+        )
+        window._show_price_result(PriceResult(
+            "Standard", "gem", 1, (gem_listing,),
+        ))
+        assert [
+            window.price_list.headerItem().text(index)
+            for index in range(window.price_list.columnCount())
+        ] == ["価格", "ジェムLv", "品質", "出品日時"]
+
+        weapon = parse_item_text("""アイテムクラス: ワンド
+レアリティ: レア
+Test Wand
+Imbued Wand
+--------
+アイテムレベル: 84
+        """)
+        window._parsed_item = weapon
+        window._configure_item_level(weapon)
+        weapon_listing = PriceListing(
+            3, "chaos", "", "Test Wand", "Imbued Wand",
+            "2026-07-23T12:00:00Z", 84, None, None, None,
+        )
+        window._show_price_result(PriceResult(
+            "Standard", "weapon", 1, (weapon_listing,),
+        ))
+        assert window.price_list.columnCount() == 3
+        assert [
+            window.price_list.headerItem().text(index)
+            for index in range(window.price_list.columnCount())
+        ] == ["価格", "ilvl", "出品日時"]
+    finally:
+        window.close()
+
+
 def test_mod_filters_are_checkable_and_minimum_is_editable(qapp):
     window = PoetoreWindow()
     window._populate_stat_filters((TradeStatFilter(
