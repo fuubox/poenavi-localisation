@@ -8,7 +8,7 @@ from src.utils.poe_version_data import POE1, POE2, get_town_zones
 from src.utils.zone_data_poe2 import DEFAULT_ZONE_DATA_POE2
 
 ZONE_MASTER_FILE = os.path.join("data", "zone_data.json")
-_ZONE_MASTER_CACHE: tuple[str, int, dict] | None = None
+_ZONE_MASTER_CACHE: tuple[str, int, int, dict] | None = None
 
 
 def get_zone_master_dir() -> str:
@@ -45,12 +45,14 @@ def load_zone_master_data() -> dict:
     path = get_zone_master_path()
     default = default_zone_master_data()
     try:
-        modified_ns = os.stat(path).st_mtime_ns
+        stat = os.stat(path)
+        modified_ns = stat.st_mtime_ns
+        file_size = stat.st_size
     except OSError:
         return default
 
-    if _ZONE_MASTER_CACHE and _ZONE_MASTER_CACHE[:2] == (path, modified_ns):
-        return _ZONE_MASTER_CACHE[2]
+    if _ZONE_MASTER_CACHE and _ZONE_MASTER_CACHE[:3] == (path, modified_ns, file_size):
+        return _ZONE_MASTER_CACHE[3]
     try:
         with open(path, "r", encoding="utf-8") as f:
             data = json.load(f)
@@ -62,7 +64,7 @@ def load_zone_master_data() -> dict:
         "zone_data_by_version": data.get("zone_data_by_version", default["zone_data_by_version"]),
         "town_zones_by_version": data.get("town_zones_by_version", default["town_zones_by_version"]),
     }
-    _ZONE_MASTER_CACHE = (path, modified_ns, result)
+    _ZONE_MASTER_CACHE = (path, modified_ns, file_size, result)
     return result
 
 
