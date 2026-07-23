@@ -22,6 +22,8 @@ changes, and displays guides, map images, and an RTA timer.
   timer state.
 - Gem acquisition tracking from imported Path of Building data. Search text
   remains canonical English so it can be pasted into the PoE search field.
+- Poetrieve price checking for PoE1 items through the official Trade API,
+  with optional poe.ninja reference prices.
 - Editable Japanese and English guide datasets. User notes, presets, imported
   PoB data, and run history remain user-owned content.
 
@@ -51,6 +53,31 @@ The default hotkeys are:
 - `F6`: toggle click-through
 - `F11`: `/hideout`
 - `F12`: `/monastery`
+- `Alt+D`: Poetrieve price check (PoE1)
+
+### PoE1: Poetrieve price checking
+
+With PoENavi running in PoE1 mode, hover over an item in your stash or
+inventory and press `Alt+D`. Poetrieve captures the item's normal and detailed
+copy text, then opens a price-check window where you can review the parsed
+item, modifiers, league, listing age, currency, and other search filters.
+
+Searches use the official Path of Exile Trade API, with poe.ninja prices shown
+as an additional reference where available. Poetrieve reads copied item text;
+it does not connect to the game client or read game memory. The window leaves
+Path of Exile focused after a capture, so you can move to another item and
+press `Alt+D` again. Click inside Poetrieve when you want to edit its filters.
+The hotkey can be changed or cleared under **Settings → Hotkeys → Poetrieve
+price check**.
+
+> [!NOTE]
+> - Poetrieve is available only for PoE1.
+> - Searches require network access to the official Trade API; poe.ninja
+>   reference prices also require access to poe.ninja.
+> - Valdo's Puzzle Box reward conditions, Inscribed Ultimatum challenge and
+>   reward conditions, and unidentified Unique candidate selection are not
+>   supported in this release. Poetrieve explains unsupported conditions in
+>   the window and omits them where a useful search can still be made.
 
 ## Guide and map data
 
@@ -97,6 +124,8 @@ MIT License — see [LICENSE](LICENSE).
 
 - [Path of Exile](https://www.pathofexile.com/) by Grinding Gear Games
 - Built with ❤️ by [Buri](https://github.com/buri34)
+- Poetrieve data sources and third-party licenses are documented in
+  [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 ## Support
 

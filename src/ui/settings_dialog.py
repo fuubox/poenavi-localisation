@@ -1486,7 +1486,8 @@ class SettingsDialog(QDialog):
             "logout": "F5",
             "hideout": "F11",
             "monastery": "F12",
-            "search_string_test": "none"
+            "search_string_test": "none",
+            "poetore_capture": "alt+d",
         })
         self.poe_version = self.current_config.get("poe_version", POE1)
         self.poe_version_mode = self.current_config.get("poe_version_mode", "ask")
@@ -1693,6 +1694,14 @@ class SettingsDialog(QDialog):
         self.search_string_test_btn = HotkeyButton(self.hotkeys.get("search_string_test", "none"))
         h_layout9.addWidget(self.search_string_test_btn)
         group_layout.addLayout(h_layout9)
+
+        h_layout10 = QHBoxLayout()
+        h_layout10.addWidget(QLabel(tr_ui("ぽえとれ検索:")))
+        self.poetore_capture_btn = HotkeyButton(
+            self.hotkeys.get("poetore_capture", "alt+d")
+        )
+        h_layout10.addWidget(self.poetore_capture_btn)
+        group_layout.addLayout(h_layout10)
         
         self.logout_enabled_cb = QCheckBox(tr_ui("ログアウト機能を有効にする（TCP切断）"))
         self.logout_enabled_cb.setChecked(self.current_config.get("logout_enabled", True))
@@ -2209,6 +2218,19 @@ class SettingsDialog(QDialog):
         support_note = QLabel(tr_ui("※ ブラウザが開きます"))
         support_note.setStyleSheet(f"color: rgba(200,200,200,150); font-size: 11px;")
         about_layout.addWidget(support_note)
+
+        # アプリの免責事項
+        poetore_separator = QFrame()
+        poetore_separator.setFrameShape(QFrame.HLine)
+        poetore_separator.setStyleSheet("color: rgba(176,255,123,0.3);")
+        about_layout.addWidget(poetore_separator)
+
+        self.app_disclaimer_label = QLabel(
+            tr_ui("ぽえなびは無料の非公式ツールです。Grinding Gear Gamesとの提携・承認関係はありません。")
+        )
+        self.app_disclaimer_label.setWordWrap(True)
+        self.app_disclaimer_label.setStyleSheet("color: rgba(200,200,200,180); font-size: 12px;")
+        about_layout.addWidget(self.app_disclaimer_label)
 
         about_layout.addStretch()
 
@@ -2732,6 +2754,7 @@ class SettingsDialog(QDialog):
                 "hideout": self.hideout_btn.key_text,
                 "monastery": self.monastery_btn.key_text,
                 "search_string_test": self.search_string_test_btn.key_text,
+                "poetore_capture": self.poetore_capture_btn.key_text,
             },
             "logout_enabled": self.logout_enabled_cb.isChecked(),
             "client_log_paths": {

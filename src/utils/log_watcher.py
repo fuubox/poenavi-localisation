@@ -36,7 +36,6 @@ class LogWatcher(QObject):
     # Set Source pattern (works regardless of chat tab settings)
     # e.g. "[SCENE] Set Source [ハイゲート]" or "[SCENE] Set Source [The Coast]"
     SET_SOURCE_PATTERN = re.compile(r"\[SCENE\] Set Source \[(.+?)\]")
-    
     def __init__(self, log_path: str = "", poll_interval_ms: int = 500, parent=None):
         super().__init__(parent)
         self.log_path = log_path
@@ -46,7 +45,7 @@ class LogWatcher(QObject):
         self._timer = QTimer(self)
         self._timer.timeout.connect(self._poll)
         self._active = False
-    
+
     def set_log_path(self, path: str):
         """ログファイルパスを設定（監視中なら再起動）"""
         was_active = self._active

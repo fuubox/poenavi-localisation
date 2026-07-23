@@ -1,0 +1,122 @@
+{
+  "schema_version": 1,
+  "source_revision": "fa31bfbbe99e04e386b4af2d71d633e2b6823c0f",
+  "source_sha256": "50209531e87e8d3d2f87d98b51ca6371dd4c2c2e4dce9c37302333e44c0a4b70",
+  "relations": [
+    {
+      "order": 1,
+      "pseudo_ref": "+#% total to Fire Resistance",
+      "group": "to_x_ele_res",
+      "stat_id": "pseudo.pseudo_total_fire_resistance"
+    },
+    {
+      "order": 2,
+      "pseudo_ref": "+#% total to Cold Resistance",
+      "group": "to_x_ele_res",
+      "stat_id": "pseudo.pseudo_total_cold_resistance"
+    },
+    {
+      "order": 3,
+      "pseudo_ref": "+#% total to Lightning Resistance",
+      "group": "to_x_ele_res",
+      "stat_id": "pseudo.pseudo_total_lightning_resistance"
+    },
+    {
+      "order": 5,
+      "pseudo_ref": "+# total to all Attributes",
+      "group": "to_all_attrs",
+      "stat_id": "pseudo.pseudo_total_all_attributes"
+    },
+    {
+      "order": 6,
+      "pseudo_ref": "+# total to Strength",
+      "group": "to_x_attr",
+      "stat_id": "pseudo.pseudo_total_strength"
+    },
+    {
+      "order": 7,
+      "pseudo_ref": "+# total to Dexterity",
+      "group": "to_x_attr",
+      "stat_id": "pseudo.pseudo_total_dexterity"
+    },
+    {
+      "order": 8,
+      "pseudo_ref": "+# total to Intelligence",
+      "group": "to_x_attr",
+      "stat_id": "pseudo.pseudo_total_intelligence"
+    },
+    {
+      "order": 17,
+      "pseudo_ref": "+#% Global Critical Strike Chance",
+      "group": "global_crit_chance",
+      "stat_id": "pseudo.pseudo_global_critical_strike_chance"
+    },
+    {
+      "order": 18,
+      "pseudo_ref": "+#% total Critical Strike Chance for Spells",
+      "replaces": "global_crit_chance",
+      "stat_id": "pseudo.pseudo_critical_strike_chance_for_spells"
+    },
+    {
+      "order": 20,
+      "pseudo_ref": "#% increased Elemental Damage",
+      "group": "incr_ele_dmg",
+      "stat_id": "pseudo.pseudo_increased_elemental_damage"
+    },
+    {
+      "order": 21,
+      "pseudo_ref": "#% increased Lightning Damage",
+      "replaces": "incr_ele_dmg",
+      "stat_id": "pseudo.pseudo_increased_lightning_damage"
+    },
+    {
+      "order": 22,
+      "pseudo_ref": "#% increased Cold Damage",
+      "replaces": "incr_ele_dmg",
+      "stat_id": "pseudo.pseudo_increased_cold_damage"
+    },
+    {
+      "order": 23,
+      "pseudo_ref": "#% increased Fire Damage",
+      "group": "incr_fire_dmg",
+      "replaces": "incr_ele_dmg",
+      "stat_id": "pseudo.pseudo_increased_fire_damage"
+    },
+    {
+      "order": 24,
+      "pseudo_ref": "#% increased Spell Damage",
+      "group": "incr_spell_dmg",
+      "stat_id": "pseudo.pseudo_increased_spell_damage"
+    },
+    {
+      "order": 25,
+      "pseudo_ref": "#% increased Lightning Spell Damage",
+      "replaces": "incr_spell_dmg",
+      "stat_id": "pseudo.pseudo_increased_lightning_spell_damage"
+    },
+    {
+      "order": 26,
+      "pseudo_ref": "#% increased Cold Spell Damage",
+      "replaces": "incr_spell_dmg",
+      "stat_id": "pseudo.pseudo_increased_cold_spell_damage"
+    },
+    {
+      "order": 27,
+      "pseudo_ref": "#% increased Fire Spell Damage",
+      "replaces": "incr_spell_dmg",
+      "stat_id": "pseudo.pseudo_increased_fire_spell_damage"
+    },
+    {
+      "order": 28,
+      "pseudo_ref": "#% increased Elemental Damage with Attack Skills",
+      "replaces": "incr_ele_dmg",
+      "stat_id": "pseudo.pseudo_increased_elemental_damage_with_attack_skills"
+    },
+    {
+      "order": 29,
+      "pseudo_ref": "#% increased Burning Damage",
+      "replaces": "incr_fire_dmg",
+      "stat_id": "pseudo.pseudo_increased_burning_damage"
+    }
+  ]
+}

@@ -20,6 +20,7 @@ from src.ui.main_window import (
     VendorSearchPresetDialog,
 )
 from src.ui.settings_dialog import SettingsDialog
+from src.poetore.ui import PoetoreWindow
 from src.utils.i18n import EN, JA, set_locale
 from src.utils.poe_version_data import POE1
 
@@ -141,4 +142,49 @@ def test_settings_generated_labels_and_tooltips_construct_in_english(qapp):
         _assert_no_japanese(tooltips)
     finally:
         dialog.deleteLater()
+        qapp.processEvents()
+
+
+def test_poetrieve_window_chrome_constructs_in_english(qapp):
+    set_locale(EN)
+    window = PoetoreWindow()
+    try:
+        assert window.windowTitle() == "Poetrieve"
+        _assert_no_japanese(_display_texts(window))
+        _assert_no_japanese(
+            [
+                widget.toolTip()
+                for widget in [window, *window.findChildren(QWidget)]
+                if widget.toolTip()
+            ]
+        )
+    finally:
+        window.close()
+        qapp.processEvents()
+
+
+def test_poetrieve_parse_error_is_shown_in_english(qapp):
+    set_locale(EN)
+    window = PoetoreWindow()
+    try:
+        window.input_edit.clear()
+        with patch("src.poetore.ui.QMessageBox.warning") as warning:
+            window.parse_current_text()
+
+        assert warning.call_args.args[1] == "Could not parse item"
+        assert warning.call_args.args[2] == "Item text is empty."
+    finally:
+        window.close()
+        qapp.processEvents()
+
+
+def test_poetrieve_trade_validation_error_is_shown_in_english(qapp):
+    set_locale(EN)
+    window = PoetoreWindow()
+    try:
+        window._show_price_error("アイテムレベルは1～100で指定してください。")
+
+        assert window.price_status.text() == "Item Level must be between 1 and 100."
+    finally:
+        window.close()
         qapp.processEvents()

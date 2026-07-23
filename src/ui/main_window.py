@@ -9,7 +9,7 @@ from PySide6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
                                QLabel, QPushButton, QMenu, QFrame, QScrollArea, QSplitter,
                                QSizeGrip, QSizePolicy, QMessageBox, QRadioButton, QButtonGroup, QApplication)
 from PySide6.QtCore import Qt, QTimer, Signal, QRect, QEvent, QEventLoop, QPoint, QSize, QMimeData, QUrl
-from PySide6.QtGui import QCursor, QMouseEvent, QIcon, QDesktopServices
+from PySide6.QtGui import QCursor, QMouseEvent, QIcon, QDesktopServices, QKeySequence
 from src.ui.styles import Styles
 from src.ui.detached_panel import DetachedPanelWindow
 from src.ui.settings_dialog import AreaNoteDialog, SettingsDialog
@@ -3328,6 +3328,29 @@ class VendorSearchPresetDialog(QDialog):
             event.ignore()
 
 
+def _hotkey_key_name(key) -> str | None:
+    """pynputのキーイベントを設定値と比較できる名前へ正規化する。"""
+    if hasattr(key, "name") and key.name:
+        return key.name.lower()
+
+    char = getattr(key, "char", None)
+    if char and char.isprintable():
+        return char.lower()
+
+    # WindowsではCtrl+A～Zが制御文字(\x01～\x1a)として届く。
+    # vkが取れる場合は物理キー名へ戻し、Ctrl+D等も設定可能にする。
+    vk = getattr(key, "vk", None)
+    if isinstance(vk, int):
+        if ord("A") <= vk <= ord("Z"):
+            return chr(vk).lower()
+        if ord("0") <= vk <= ord("9"):
+            return chr(vk)
+
+    if char and len(char) == 1 and 1 <= ord(char) <= 26:
+        return chr(ord("a") + ord(char) - 1)
+    return None
+
+
 class MainWindow(QMainWindow):
     # Qt may call an overridden showEvent from QMainWindow.__init__ before
     # this class' __init__ body can initialize instance attributes.
@@ -4495,6 +4518,14 @@ class MainWindow(QMainWindow):
         self.vendor_search_btn.setToolTip(tr_ui("店売り・スタッシュ検索プリセット"))
         self.vendor_search_btn.clicked.connect(self.open_vendor_search_presets)
         global_controls_layout.addWidget(self.vendor_search_btn)
+
+        self.poetore_btn = QPushButton("💰")
+        self.poetore_btn.setStyleSheet(Styles.BUTTON)
+        self.poetore_btn.setFixedSize(35, 35)
+        self._update_poetore_hotkey_tooltip()
+        self.poetore_btn.clicked.connect(self.open_poetore)
+        global_controls_layout.addWidget(self.poetore_btn)
+        self._refresh_poetore_availability()
         
         self.settings_btn = QPushButton("⚙")
         self.settings_btn.setStyleSheet(Styles.BUTTON)
@@ -6105,32 +6136,58 @@ class MainWindow(QMainWindow):
             for action, default in [("start_stop", "F1"), ("reset", "F2"), ("lap", "F3"),
                                      ("undo_lap", "F4"), ("click_through", DEFAULT_CLICK_THROUGH_HOTKEY), ("logout", "F5"),
                                      ("hideout", "F11"), ("monastery", "F12"),
-                                     ("search_string_test", "none")]:
+                                     ("search_string_test", "none"), ("poetore_capture", "alt+d")]:
+                if action == "poetore_capture" and not self._poetore_enabled():
+                    continue
                 key = hotkeys.get(action, default)
                 if key and key != "none":
                     self.hotkey_map[key.lower()] = action
             
             print(f"Registering hotkeys: {self.hotkey_map}")
             
+            pressed_modifiers = set()
+            triggered_combos = set()
+
             def on_press(key):
                 try:
-                    # キー名を取得
-                    if hasattr(key, 'name'):
-                        key_name = key.name.lower()
-                    elif hasattr(key, 'char') and key.char:
-                        key_name = key.char.lower()
-                    else:
+                    key_name = _hotkey_key_name(key)
+                    if key_name is None:
                         return
                     
-                    # ホットキーマップをチェック
+                    if key_name in {"alt", "alt_l", "alt_r", "alt_gr"}:
+                        pressed_modifiers.add("alt")
+                    elif key_name in {"ctrl", "ctrl_l", "ctrl_r"}:
+                        pressed_modifiers.add("ctrl")
+                    elif key_name in {"shift", "shift_l", "shift_r"}:
+                        pressed_modifiers.add("shift")
+
+                    combo = "+".join([modifier for modifier in ("ctrl", "alt", "shift") if modifier in pressed_modifiers] + [key_name])
+                    if combo in self.hotkey_map and combo not in triggered_combos:
+                        triggered_combos.add(combo)
+                        self.hotkey_signal.emit(self.hotkey_map[combo])
+                        return
+
+                    # 単独ホットキーマップをチェック
                     if key_name in self.hotkey_map:
                         command = self.hotkey_map[key_name]
                         print(f"[HOTKEY DEBUG] key={key_name} command={command} search_in_progress={getattr(self, '_search_paste_in_progress', False)}")
                         self.hotkey_signal.emit(command)
                 except Exception as e:
                     print(f"Hotkey error: {e}")
+
+            def on_release(key):
+                key_name = _hotkey_key_name(key)
+                if key_name is None:
+                    return
+                if key_name in {"alt", "alt_l", "alt_r", "alt_gr"}:
+                    pressed_modifiers.discard("alt")
+                elif key_name in {"ctrl", "ctrl_l", "ctrl_r"}:
+                    pressed_modifiers.discard("ctrl")
+                elif key_name in {"shift", "shift_l", "shift_r"}:
+                    pressed_modifiers.discard("shift")
+                triggered_combos.clear()
             
-            self.keyboard_listener = pynput_keyboard.Listener(on_press=on_press)
+            self.keyboard_listener = pynput_keyboard.Listener(on_press=on_press, on_release=on_release)
             self.keyboard_listener.start()
             
         except Exception as e:
@@ -6159,6 +6216,8 @@ class MainWindow(QMainWindow):
             self.execute_chat_command("/monastery")
         elif command == "search_string_test":
             self.open_search_string_paste_test()
+        elif command == "poetore_capture" and self._poetore_enabled():
+            self.capture_poetore_item()
 
     def open_search_string_paste_test(self):
         """ベンダー検索プリセット→元ウィンドウ復帰→検索欄貼り付け。"""
@@ -7215,6 +7274,48 @@ class MainWindow(QMainWindow):
             self.config.get("text_opacity", 100)
         )
         self._memo_dialog.show()
+
+    def open_poetore(self):
+        """ぽえとれを必要になった時だけ読み込んで別ウィンドウで開く。"""
+        if not self._poetore_enabled():
+            return
+        from src.poetore.ui import show_poetore_window
+
+        show_poetore_window(self)
+
+    def capture_poetore_item(self):
+        """設定済みホットキーからぽえとれを開き、PoE上のアイテムを自動取得する。"""
+        if not self._poetore_enabled():
+            return
+        from src.poetore.ui import show_poetore_window
+
+        # コピーが終わるまでPoEからフォーカスを奪わない。
+        show_poetore_window(self, activate=False).capture_from_poe()
+
+    def _poetore_enabled(self):
+        config = getattr(self, "config", {})
+        return config.get(
+            "poe_version",
+            getattr(self, "poe_version", POE1),
+        ) == POE1
+
+    def _refresh_poetore_availability(self):
+        enabled = self._poetore_enabled()
+        self.poetore_btn.setVisible(enabled)
+        if not enabled:
+            window = getattr(self, "_poetore_window", None)
+            if window is not None:
+                window.close()
+
+    def _update_poetore_hotkey_tooltip(self):
+        hotkey = self.config.get("hotkeys", {}).get("poetore_capture", "alt+d")
+        if hotkey and hotkey != "none":
+            display_hotkey = QKeySequence(hotkey).toString(QKeySequence.NativeText)
+            self.poetore_btn.setToolTip(
+                tr_ui(f"ぽえとれ（{display_hotkey}で日本語名＋詳細Modを取得）")
+            )
+        else:
+            self.poetore_btn.setToolTip(tr_ui("ぽえとれ（ホットキー未設定）"))
     
     def open_settings(self):
         dialog = SettingsDialog(self, self.config)
@@ -7239,6 +7340,7 @@ class MainWindow(QMainWindow):
             # ホットキー再登録
             self.register_hotkeys()
             self._update_click_through_label()
+            self._update_poetore_hotkey_tooltip()
             
             # ログ監視の再設定
             active_version = self.config.get("poe_version", self.poe_version)
@@ -7294,6 +7396,7 @@ class MainWindow(QMainWindow):
             if "gem" in self.panel_registry:
                 self.panel_registry["gem"]["content"].setVisible(self.poe_version == POE1)
             self.part2_btn.setVisible(self.poe_version == POE1)
+            self._refresh_poetore_availability()
             self._refresh_mini_navi_toggle()
             self._refresh_guide_detail_level_toggle()
             

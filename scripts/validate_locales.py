@@ -478,7 +478,11 @@ def validate_raw_ui_literals(root: Path = ROOT) -> list[str]:
     Qt display APIs are inspected.
     """
     errors: list[str] = []
-    for path in (root / "src" / "ui").rglob("*.py"):
+    ui_paths = list((root / "src" / "ui").rglob("*.py"))
+    poetore_ui = root / "src" / "poetore" / "ui.py"
+    if poetore_ui.is_file():
+        ui_paths.append(poetore_ui)
+    for path in ui_paths:
         if path.name == "language_dialog.py":
             continue
         try:

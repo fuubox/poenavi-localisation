@@ -1,0 +1,114 @@
+[
+  {
+    "id": "physical_weapon",
+    "group": "武器/物理",
+    "trade_base": "Reaver Sword",
+    "text": "アイテムクラス: 両手剣\nレアリティ: レア\n破滅の刃\n略奪者の剣\n--------\n品質: +20% (augmented)\n物理ダメージ: 108-181 (augmented)\n秒間アタック回数: 1.74 (augmented)\n--------\nアイテムレベル: 86\n--------\n物理ダメージが74%増加する\n",
+    "expected_enabled": {"property.physical_dps": 226.0},
+    "expected_misc": {"corrupted": "false", "split": "false"}
+  },
+  {
+    "id": "elemental_weapon",
+    "group": "武器/属性",
+    "trade_base": "Imbued Wand",
+    "text": "アイテムクラス: ワンド\nレアリティ: レア\n嵐の枝\nインブードワンド\n--------\n元素ダメージ: 20-40, 30-60, 10-20 (augmented)\n秒間アタック回数: 1.50 (augmented)\n--------\nアイテムレベル: 84\n",
+    "expected_enabled": {"property.elemental_dps": 121.0},
+    "expected_misc": {"corrupted": "false", "split": "false"}
+  },
+  {
+    "id": "mixed_weapon",
+    "group": "武器/物理+属性",
+    "trade_base": "Reaver Sword",
+    "text": "アイテムクラス: 両手剣\nレアリティ: レア\n混沌の刃\n略奪者の剣\n--------\n品質: +20% (augmented)\n物理ダメージ: 100-200 (augmented)\n元素ダメージ: 20-40 (augmented)\n秒間アタック回数: 1.50 (augmented)\n--------\nアイテムレベル: 84\n",
+    "expected_enabled": {"property.total_dps": 243.0, "property.physical_dps": 202.0},
+    "expected_misc": {"corrupted": "false", "split": "false"}
+  },
+  {
+    "id": "spell_weapon",
+    "group": "武器/スペル",
+    "trade_base": "Imbued Wand",
+    "stat_entries": [{"id": "explicit.stat_2974417149", "text": "スペルダメージが#%増加する", "type": "explicit"}],
+    "text": "アイテムクラス: ワンド\nレアリティ: レア\n賢者の枝\nインブードワンド\n--------\nクリティカル率: 7.00%\n秒間アタック回数: 1.50\n--------\nアイテムレベル: 86\n--------\n{ プレフィックスモッド「ルーンの」 (ティア: 1) }\nスペルダメージが80(75-84)%増加する\n",
+    "expected_enabled": {},
+    "expected_visible": ["pseudo.pseudo_increased_spell_damage"],
+    "expected_misc": {"corrupted": "false", "split": "false"}
+  },
+  {
+    "id": "armour_es_hybrid",
+    "group": "防具/Armour+ES",
+    "trade_base": "Sacred Chainmail",
+    "text": "アイテムクラス: 鎧\nレアリティ: レア\n海獣の毛皮\n聖なるチェインメイル\n--------\n品質: +30% (augmented)\nアーマー: 2940 (augmented)\nエナジーシールド: 642 (augmented)\n--------\nアイテムレベル: 94\n--------\nスプリット\n--------\nクルセイダーアイテム\nウォーロードアイテム\n",
+    "expected_enabled": {"property.armour": 2646.0, "property.energy_shield": 577.0, "property.quality": 30.0},
+    "expected_misc": {"corrupted": "false"},
+    "expected_absent_misc": ["split"]
+  },
+  {
+    "id": "evasion_armour_hybrid",
+    "group": "防具/Armour+Evasion",
+    "trade_base": "Full Dragonscale",
+    "text": "アイテムクラス: 鎧\nレアリティ: レア\n竜の皮\nフルドラゴンスケイル\n--------\nアーマー: 1200 (augmented)\n回避力: 1800 (augmented)\n--------\nアイテムレベル: 86\n",
+    "expected_enabled": {"property.armour": 1296.0, "property.evasion": 1944.0},
+    "expected_misc": {"corrupted": "false", "split": "false"}
+  },
+  {
+    "id": "ward_armour",
+    "group": "防具/Ward",
+    "trade_base": "Runic Crown",
+    "text": "アイテムクラス: ヘルメット\nレアリティ: レア\n霧の王冠\nルーニッククラウン\n--------\nWard: 500 (augmented)\n--------\nアイテムレベル: 86\n",
+    "expected_enabled": {"property.ward": 540.0},
+    "expected_misc": {"corrupted": "false", "split": "false"}
+  },
+  {
+    "id": "accessory_pseudos",
+    "group": "装飾品/ライフ+耐性+能力値",
+    "trade_base": "Ruby Ring",
+    "text": "アイテムクラス: 指輪\nレアリティ: レア\n生命の輪\nルビーの指輪\n--------\nアイテムレベル: 85\n--------\n最大ライフ +70\n火耐性 +30%\n冷気および雷耐性 +20%\n混沌耐性 +10%\n全ての能力値 +20\n",
+    "expected_enabled": {"pseudo.pseudo_total_life": 72.0, "pseudo.pseudo_total_elemental_resistance": 63.0, "pseudo.pseudo_total_chaos_resistance": 9.0},
+    "expected_visible": ["pseudo.pseudo_total_all_attributes"],
+    "expected_misc": {"corrupted": "false", "split": "false"}
+  },
+  {
+    "id": "variable_unique",
+    "group": "ユニーク/可変3個以下",
+    "trade_base": "Gold Amulet",
+    "trade_name": "The Ignomon",
+    "stat_entries": [{"id": "explicit.life", "text": "最大ライフ +#", "type": "explicit"}],
+    "text": "アイテムクラス: アミュレット\nレアリティ: ユニーク\nイグノモン\nゴールドアミュレット\n--------\nアイテムレベル: 70\n--------\n最大ライフ +40(30-50)\n火耐性 +10%\n",
+    "expected_enabled": {"explicit.life": 38.0},
+    "expected_misc": {"corrupted": "false"}
+  },
+  {
+    "id": "fractured_crafted",
+    "group": "特殊/Fractured+Crafted+空き枠",
+    "trade_base": "Ruby Ring",
+    "stat_entries": [
+      {"id": "fractured.stat_3372524247", "text": "火耐性 +#%", "type": "fractured"},
+      {"id": "crafted.stat_3299347043", "text": "最大ライフ +#", "type": "crafted"}
+    ],
+    "text": "アイテムクラス: 指輪\nレアリティ: レア\n割れた環\nルビーの指輪\n--------\nアイテムレベル: 86\n--------\n{ フラクチャー サフィックスモッド「火炎の」 (ティア: 1) }\n火耐性 +40(36-41)%\n{ マスタークラフト プレフィックスモッド「製作の」 }\n最大ライフ +55\n",
+    "expected_enabled": {"pseudo.pseudo_total_life": 49.0, "pseudo.pseudo_total_elemental_resistance": 36.0},
+    "expected_visible": ["pseudo.pseudo_number_of_empty_prefix_mods", "pseudo.pseudo_number_of_empty_suffix_mods"],
+    "expected_misc": {"corrupted": "false"}
+  },
+  {
+    "id": "synth_enchant_corrupted",
+    "group": "特殊/Synthesised+Enchant+Corrupted",
+    "trade_base": "Hubris Circlet",
+    "stat_entries": [{"id": "enchant.stat_2156140483", "text": "ヘイトレッドのマナリザーブ効率が#%増加する", "type": "enchant"}],
+    "text": "アイテムクラス: ヘルメット\nレアリティ: レア\n夢の冠\nハブリスサークレット\n--------\nエナジーシールド: 500 (augmented)\n--------\nアイテムレベル: 86\n--------\n{ エンチャントモッド }\nヘイトレッドのマナリザーブ効率が10%増加する\n--------\nシンセサイズアイテム\nコラプト状態\n",
+    "expected_enabled": {"property.energy_shield": 540.0},
+    "expected_visible": ["enchant.stat_2156140483"],
+    "expected_absent_misc": ["corrupted"],
+    "expected_misc": {}
+  },
+  {
+    "id": "mirrored_foil_unique",
+    "group": "状態/Mirrored+Foil",
+    "trade_base": "Chain Belt",
+    "trade_name": "Auxium",
+    "text": "アイテムクラス: ベルト\nレアリティ: ユニーク\nオーキシウム\nチェインベルト\n--------\nアイテムレベル: 70\n--------\nフォイル\nミラー品\n",
+    "expected_enabled": {},
+    "expected_misc": {"corrupted": "false", "foulborn_item": "false"},
+    "expected_rarity": "uniquefoil"
+  }
+]

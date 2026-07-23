@@ -2,7 +2,11 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from scripts.validate_locales import validate_all, validate_local_import_scoping
+from scripts.validate_locales import (
+    validate_all,
+    validate_local_import_scoping,
+    validate_raw_ui_literals,
+)
 
 
 class LocaleValidationTest(unittest.TestCase):
@@ -42,6 +46,25 @@ class LocaleValidationTest(unittest.TestCase):
             failures = validate_local_import_scoping(root)
 
         self.assertEqual(failures, [])
+
+    def test_poetrieve_ui_raw_japanese_literal_is_rejected(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            poetore_dir = root / "src" / "poetore"
+            poetore_dir.mkdir(parents=True)
+            (poetore_dir / "ui.py").write_text(
+                "from PySide6.QtWidgets import QLabel\n"
+                "def build():\n"
+                "    return QLabel('価格検索')\n",
+                encoding="utf-8",
+            )
+
+            failures = validate_raw_ui_literals(root)
+
+        self.assertEqual(len(failures), 1)
+        self.assertIn("src", failures[0])
+        self.assertIn("poetore", failures[0])
+        self.assertIn("ui.py", failures[0])
 
 
 if __name__ == "__main__":

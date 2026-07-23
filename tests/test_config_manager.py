@@ -43,6 +43,70 @@ def write_default_config(app_dir: Path, overrides=None):
 
 
 class ConfigManagerTest(unittest.TestCase):
+    def test_schema_v4_config_receives_poetrieve_hotkey_without_losing_locale(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            app_dir = Path(tmp) / "app"
+            user_dir = Path(tmp) / "user-data"
+            app_dir.mkdir()
+            user_dir.mkdir()
+            write_default_config(app_dir, {
+                "hotkeys": {"poetore_capture": "alt+d"},
+                "language": "ja",
+                "language_selected": False,
+                "mini_guide_overlay": {"display_mode": "standard"},
+            })
+            (user_dir / ConfigManager.CONFIG_FILE).write_text(
+                json.dumps({
+                    "schemaVersion": 4,
+                    "language": "en",
+                    "language_selected": True,
+                    "hotkeys": {"start_stop": "F7"},
+                    "mini_guide_overlay": {"display_mode": "compact"},
+                }),
+                encoding="utf-8",
+            )
+
+            with patch.dict(
+                os.environ,
+                {ConfigManager.ENV_USER_DATA_DIR: str(user_dir)},
+            ), patch.object(ConfigManager, "get_app_dir", return_value=app_dir):
+                loaded = ConfigManager.load_config()
+
+            self.assertEqual(loaded["schemaVersion"], 4)
+            self.assertEqual(loaded["language"], "en")
+            self.assertTrue(loaded["language_selected"])
+            self.assertEqual(loaded["hotkeys"]["poetore_capture"], "alt+d")
+            self.assertEqual(
+                loaded["mini_guide_overlay"]["display_mode"],
+                "compact",
+            )
+
+    def test_existing_alt_d_hotkey_is_not_stolen_by_poetrieve_default(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            app_dir = Path(tmp) / "app"
+            user_dir = Path(tmp) / "user-data"
+            app_dir.mkdir()
+            user_dir.mkdir()
+            write_default_config(app_dir, {
+                "hotkeys": {"poetore_capture": "alt+d"},
+            })
+            (user_dir / ConfigManager.CONFIG_FILE).write_text(
+                json.dumps({
+                    "schemaVersion": 4,
+                    "hotkeys": {"start_stop": "Alt+D"},
+                }),
+                encoding="utf-8",
+            )
+
+            with patch.dict(
+                os.environ,
+                {ConfigManager.ENV_USER_DATA_DIR: str(user_dir)},
+            ), patch.object(ConfigManager, "get_app_dir", return_value=app_dir):
+                loaded = ConfigManager.load_config()
+
+            self.assertEqual(loaded["hotkeys"]["start_stop"], "Alt+D")
+            self.assertEqual(loaded["hotkeys"]["poetore_capture"], "none")
+
     def test_schema_v4_adds_standard_mode_to_localized_schema_v3_config(self):
         migrated = ConfigManager._migrate_config({
             "schemaVersion": 3,

@@ -447,6 +447,23 @@ class ConfigManager:
             raw_config["language_selected"] = True
 
         default_config = cls._load_default_config_template()
+        raw_hotkeys = raw_config.get("hotkeys")
+        default_hotkeys = default_config.get("hotkeys", {})
+        if (
+            isinstance(raw_hotkeys, dict)
+            and "poetore_capture" not in raw_hotkeys
+            and isinstance(default_hotkeys, dict)
+        ):
+            poetore_default = str(
+                default_hotkeys.get("poetore_capture", "none")
+            ).strip().casefold()
+            if poetore_default != "none" and any(
+                str(value).strip().casefold() == poetore_default
+                for value in raw_hotkeys.values()
+            ):
+                # An upgraded installation may already use Alt+D. Do not let
+                # the newly introduced default silently replace that action.
+                raw_hotkeys["poetore_capture"] = "none"
         migrated = cls._migrate_config(cls._deep_merge(default_config, raw_config))
         if isinstance(raw_config, dict) and "area_note_migration_notice_shown" not in raw_config:
             # この案内は旧版利用者向け。新規設定ではdefault_configのtrueを使い、
