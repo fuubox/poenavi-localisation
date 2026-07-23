@@ -380,10 +380,11 @@ def test_mod_filters_are_checkable_and_minimum_is_editable(qapp):
     window.close()
 
 
-def test_mod_filter_condition_column_is_one_and_a_half_times_wider(qapp):
+def test_mod_filter_check_and_condition_columns_fit_without_clipping(qapp):
     window = PoetoreWindow()
     try:
-        assert window.mod_filter_tree.columnWidth(3) == 384
+        assert window.mod_filter_tree.columnWidth(0) == 40
+        assert window.mod_filter_tree.columnWidth(3) == 346
     finally:
         window.close()
 
