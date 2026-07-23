@@ -1443,6 +1443,27 @@ def _english_trade_item_name(japanese_name: str) -> str | None:
     return None
 
 
+def _japanese_trade_item_name(english_name: str) -> str | None:
+    """公式日英itemsの同一グループ・同一位置から日本語固有名を得る。"""
+    wanted = english_name.strip()
+    if not wanted:
+        return None
+    for english_group, japanese_group in zip(
+        _trade_item_groups(), _jp_trade_item_groups(),
+    ):
+        if len(english_group) != len(japanese_group):
+            continue
+        for english, japanese in zip(english_group, japanese_group):
+            if str(english.get("name", "")).strip() != wanted:
+                continue
+            if bool((english.get("flags") or {}).get("unique")) != bool(
+                (japanese.get("flags") or {}).get("unique")
+            ):
+                continue
+            return str(japanese.get("name", "")).strip() or None
+    return None
+
+
 def _japanese_trade_item_type(english_type: str) -> str | None:
     """公式日英itemsの同一位置から日本語Trade用typeを得る。"""
     wanted = english_type.strip()
@@ -2675,6 +2696,11 @@ def search_prices(
         else:
             web_query["type"] = localized_type
     localized_name = item.name.strip()
+    if _is_unique(item):
+        # 日本語クライアントでも詳細コピーのUnique名は英語になる場合がある。
+        # 日本語Tradeへ英語名を渡すと検索状態の読込が失敗するため、
+        # 公式itemsの日英対応から正式な日本語Unique名へ変換する。
+        localized_name = _japanese_trade_item_name(localized_name) or localized_name
     if "name" in web_query and localized_name:
         if isinstance(web_query["name"], dict):
             web_query["name"]["option"] = localized_name

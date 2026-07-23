@@ -1541,6 +1541,44 @@ Iron Ring
     assert "foulborn_item" not in query["filters"]["misc_filters"]["filters"]
 
 
+def test_foulborn_unique_localizes_name_for_japanese_trade_link():
+    _trade_response_cache.clear()
+    item = parse_item_text("""アイテムクラス: 指輪
+レアリティ: ユニーク
+Foulborn Le Heup of All
+Iron Ring
+--------
+アイテムレベル: 83
+--------
+{ ユニークモッド — 能力値 }
+全ての能力値 +22(10-30)
+{ ユニークモッド — 元素, 耐性 }
+全ての元素耐性 +29(10-30)%
+{ ユニークモッド — ドロップ }
+見つかるアイテムのレアリティが16(10-30)%増加する
+{ ファウルボーンユニークモッド — 防御 }
+グローバル防御力が16(10-30)%増加する
+""")
+    filters = resolve_trade_stat_filters(
+        item, trade_base_type="Iron Ring", trade_name=item.name,
+    )
+    response = ({"id": "foulborn-query", "result": [], "total": 0}, {})
+    with patch("src.poetore.trade._request_json", return_value=response), patch(
+        "src.poetore.trade._japanese_trade_item_type", return_value="鉄の指輪",
+    ), patch(
+        "src.poetore.trade._japanese_trade_item_name", return_value="皆を繋ぐもの",
+    ):
+        result = search_prices(
+            item, "Iron Ring", "Standard", stat_filters=filters,
+            trade_name=item.name,
+        )
+
+    web_query = json.loads(parse_qs(urlsplit(result.web_url).query)["q"][0])["query"]
+    assert web_query["name"] == "皆を繋ぐもの"
+    assert web_query["type"] == "鉄の指輪"
+    assert len(web_query["stats"][0]["filters"]) == 4
+
+
 def test_replica_dragonfang_uses_distinct_reservation_and_requirements_filters():
     item = parse_item_text("""アイテムクラス: アミュレット
 レアリティ: ユニーク
