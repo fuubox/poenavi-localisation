@@ -14,7 +14,7 @@ from urllib.request import Request, urlopen
 from .models import ParsedItem
 from .metadata import (
     base_armour_bounds, default_metadata_index, gem_metadata, normalize_stat_text,
-    pseudo_definitions, pseudo_relations,
+    pseudo_definitions, pseudo_relations, unique_fixed_stats,
 )
 
 
@@ -1656,6 +1656,7 @@ def resolve_trade_stat_filters(
     entries = _trade_stat_entries()
     resolved: list[TradeStatFilter] = []
     unique_item = _is_unique(item)
+    fixed_unique_refs = unique_fixed_stats(item.name) if unique_item else None
     modifiers = _combine_valdo_multiline_modifiers(item, entries)
     for modifier in modifiers:
         if modifier.ref == "Allocates #" and modifier.oils:
@@ -1669,8 +1670,10 @@ def resolve_trade_stat_filters(
                 continue
         roll_bounds = _unique_roll_bounds(modifier.text) if unique_item else None
         if unique_item and roll_bounds is None:
-            # 固定値は同名ユニーク間で価格比較に寄与しない。
-            continue
+            if fixed_unique_refs is None or modifier.ref in fixed_unique_refs:
+                # Awakened準拠: 常設Modでも可変ロールがあれば候補へ残す。
+                # 数値なしModはfixedStats外のVariantだけを候補として扱う。
+                continue
         api_kind = "explicit" if modifier.kind in {"prefix", "suffix"} else modifier.kind
         source = _normalized_stat_text(modifier.text)
         candidates = []

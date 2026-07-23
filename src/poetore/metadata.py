@@ -41,6 +41,18 @@ def gem_metadata(name: str, path: Path | None = None) -> dict:
     return dict(_load_payload(str(path)).get("gems", {}).get(name.strip().casefold(), {}))
 
 
+def unique_fixed_stats(name: str, path: Path | None = None) -> frozenset[str] | None:
+    """Awakened由来の固定Mod一覧を返す。未収録ユニークはNoneで区別する。"""
+    path = (path or Path(os.environ.get("POETORE_METADATA_PATH", INDEX_PATH))).resolve()
+    if not name or not path.exists():
+        return None
+    records = _load_payload(str(path)).get("unique_fixed_stats", {})
+    key = name.strip().casefold()
+    if key not in records:
+        return None
+    return frozenset(str(ref) for ref in records[key])
+
+
 def pseudo_relations(path: Path | None = None) -> tuple[dict, ...]:
     """Awakened固定commitから機械抽出したpseudo間関係を返す。"""
     path = (path or PSEUDO_RELATIONS_PATH).resolve()

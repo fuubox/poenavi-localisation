@@ -88,6 +88,23 @@ def _gems(items_lines: Iterable[str]) -> dict[str, dict]:
     return dict(sorted(result.items()))
 
 
+def _unique_fixed_stats(items_lines: Iterable[str]) -> dict[str, list[str]]:
+    """Awakenedのユニーク別fixedStatsを名前で引ける派生データへ縮小する。"""
+    result = {}
+    for line in items_lines:
+        if not line.strip():
+            continue
+        row = json.loads(line)
+        unique = row.get("unique") or {}
+        fixed_stats = unique.get("fixedStats")
+        if row.get("namespace") != "UNIQUE" or not row.get("refName") or fixed_stats is None:
+            continue
+        result[str(row["refName"]).strip().casefold()] = [
+            str(ref) for ref in fixed_stats if str(ref).strip()
+        ]
+    return dict(sorted(result.items()))
+
+
 def build_minimal_index(awakened_lines: Iterable[str], jp_trade: dict,
                         repoe_stats: dict | None = None,
                         repoe_mods: dict | None = None,
@@ -151,6 +168,7 @@ def build_minimal_index(awakened_lines: Iterable[str], jp_trade: dict,
         "scope": "PoE1 trade stat matching for equipment and gems",
         "base_armour": _base_armour(awakened_items),
         "gems": _gems(awakened_items),
+        "unique_fixed_stats": _unique_fixed_stats(awakened_items),
         "mods": records,
     }
 
@@ -174,6 +192,11 @@ def validate_minimal_index(payload: dict) -> dict:
                     or not isinstance(bounds, list) or len(bounds) != 2
                     or bounds[0] >= bounds[1]):
                 errors.append(f"invalid base armour bounds: {base_type}:{defence}={bounds}")
+    for unique_name, fixed_stats in payload.get("unique_fixed_stats", {}).items():
+        if (not unique_name or not isinstance(fixed_stats, list)
+                or any(not isinstance(ref, str) or not ref.strip() for ref in fixed_stats)
+                or len(fixed_stats) != len(set(fixed_stats))):
+            errors.append(f"invalid unique fixed stats: {unique_name}")
     keys: set[tuple[str, str]] = set()
     matchers: dict[tuple[str, str], list[str]] = {}
     for index, row in enumerate(mods):

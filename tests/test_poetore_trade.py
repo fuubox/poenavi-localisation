@@ -1333,6 +1333,46 @@ Item Level: 70
     assert not any(row.enabled for row in filters)
 
 
+def test_watchers_eye_uses_awakened_fixed_stats_and_keeps_unscalable_variant():
+    item = parse_item_text("""アイテムクラス: ジュエル
+レアリティ: ユニーク
+Watcher's Eye
+Prismatic Jewel
+--------
+アイテムレベル: 86
+--------
+{ ユニークモッド — ライフ }
+最大ライフが6(4-6)%増加する
+{ ユニークモッド — キャスター, 呪い }
+ヘイストの影響を受けている時にテンポラルチェーンの影響を受けない — スケールできない値
+(Unaffected: 影響を受けない場合でも、デバフがかけられるが、それによる効果は表れない)
+""")
+    entries = (
+        {
+            "id": "explicit.stat_983749596",
+            "text": "最大ライフが#%増加する",
+            "type": "explicit",
+        },
+        {
+            "id": "explicit.stat_2806391472",
+            "text": "ヘイストの影響を受けている時にテンポラルチェーンの影響を受けない",
+            "type": "explicit",
+        },
+    )
+    fixed = frozenset({"#% increased maximum Life"})
+    with patch("src.poetore.trade._trade_stat_entries", return_value=entries), patch(
+        "src.poetore.trade.unique_fixed_stats", return_value=fixed
+    ):
+        filters = resolve_trade_stat_filters(item)
+    assert [row.stat_id for row in filters] == [
+        "explicit.stat_983749596",
+        "explicit.stat_2806391472",
+    ]
+    assert filters[0].min_value == 6.0
+    assert filters[1].min_value is None
+    assert all(row.enabled for row in filters)
+
+
 def test_unidentified_unique_query_requires_unidentified_state():
     item = parse_item_text("""Item Class: Amulets
 Rarity: Unique

@@ -3,7 +3,7 @@ from pathlib import Path
 
 from src.poetore.metadata import (
     MetadataIndex, ModMetadata, OptionValue, pseudo_definitions, pseudo_relations,
-    diff_pseudo_payloads, validate_pseudo_payload,
+    diff_pseudo_payloads, unique_fixed_stats, validate_pseudo_payload,
 )
 from src.poetore.metadata_builder import (
     build_minimal_index, diff_minimal_indexes, excessive_removal, unresolved_trade_entries,
@@ -109,6 +109,37 @@ def test_builder_keeps_minimal_gem_level_and_variant_metadata():
         "trade_type": "Arc", "max_level": 20, "transfigured": True,
         "vaal": False, "discriminator": "alt_x",
     }}
+
+
+def test_builder_keeps_awakened_unique_fixed_stats_and_loader_distinguishes_missing(tmp_path):
+    items = [
+        json.dumps({
+            "name": "Watcher's Eye", "refName": "Watcher's Eye", "namespace": "UNIQUE",
+            "unique": {
+                "base": "Prismatic Jewel",
+                "fixedStats": [
+                    "#% increased maximum Energy Shield",
+                    "#% increased maximum Life",
+                    "#% increased maximum Mana",
+                ],
+            },
+        }),
+        json.dumps({
+            "name": "No Metadata", "refName": "No Metadata", "namespace": "UNIQUE",
+            "unique": {"base": "Ring"},
+        }),
+    ]
+    payload = build_minimal_index([], {"result": []}, awakened_items=items)
+    expected = {
+        "#% increased maximum Energy Shield",
+        "#% increased maximum Life",
+        "#% increased maximum Mana",
+    }
+    assert set(payload["unique_fixed_stats"]["watcher's eye"]) == expected
+    path = tmp_path / "metadata.json"
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    assert unique_fixed_stats("WATCHER'S EYE", path) == frozenset(expected)
+    assert unique_fixed_stats("No Metadata", path) is None
 
 
 def test_metadata_search_bounds_support_minimum_maximum_and_exact():
