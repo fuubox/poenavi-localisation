@@ -3304,15 +3304,25 @@ class DetachedPanelWindow(QWidget):
         self._return_callback = return_callback
         self._state_callback = state_callback
         self._returning = False
+        self.setWindowFlags(Qt.Tool | Qt.FramelessWindowHint)
         self.setWindowTitle(title)
         self.setStyleSheet(f"background-color: {Styles.BACKGROUND_COLOR}; color: {Styles.TEXT_COLOR};")
         self.resize(max(320, content.width()), max(180, content.height()))
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(8, 8, 8, 8)
+        layout.setContentsMargins(0, 0, 0, 0)
+        header = QWidget()
+        header.setStyleSheet(f"background-color: {Styles.BACKGROUND_COLOR};")
+        header_layout = QHBoxLayout(header)
+        header_layout.setContentsMargins(8, 5, 8, 5)
+        self.title_label = QLabel(title)
+        self.title_label.setStyleSheet(f"color: {Styles.TEXT_COLOR}; font-weight: bold;")
+        header_layout.addWidget(self.title_label)
+        header_layout.addStretch()
         return_button = QPushButton("↙ 本体へ戻す")
         return_button.clicked.connect(self.return_to_main)
-        layout.addWidget(return_button, alignment=Qt.AlignRight)
+        header_layout.addWidget(return_button)
+        layout.addWidget(header)
         layout.addWidget(content)
 
     def return_to_main(self):
