@@ -388,6 +388,57 @@ def test_mod_filter_condition_column_is_one_and_a_half_times_wider(qapp):
         window.close()
 
 
+def test_watchers_eye_shows_all_three_variable_aura_mods_in_actual_ui(qapp):
+    window = PoetoreWindow()
+    try:
+        window.input_edit.setPlainText("""アイテムクラス: ジュエル
+レアリティ: ユニーク
+Watcher's Eye
+Prismatic Jewel
+--------
+個数制限: 1
+--------
+アイテムレベル: 86
+--------
+{ ユニークモッド — ライフ }
+最大ライフが6(4-6)%増加する
+{ ユニークモッド — 防御, エナジーシールド }
+最大エナジーシールドが4(4-6)%増加する
+{ ユニークモッド — マナ }
+最大マナが6(4-6)%増加する
+{ ユニークモッド — キャスター, 呪い }
+ヘイストの影響を受けている時にテンポラルチェーンの影響を受けない — スケールできない値
+(Unaffected: 影響を受けない場合でも、デバフがかけられるが、それによる効果は表れない)
+{ ユニークモッド — アタック, スピード }
+プレシジョンの影響を受けている時にアタックスピードが15(10-15)%増加する
+{ ユニークモッド }
+デターミネーションの影響を受けている時にアタックブロック率 +7(5-8)%
+--------
+一人ずつ、彼らは理解することも、
+ましてや倒すことも期待できぬ生き物の前に立ちふさがり、
+そして一人ずつ、彼らはそれの一部となった。
+--------
+パッシブツリーで割り当てられたジュエルソケットにはめる。右クリックしてソケットから取り外すことができる。""")
+        window.parse_current_text()
+
+        rows = [
+            window.mod_filter_tree.topLevelItem(index)
+            for index in range(window.mod_filter_tree.topLevelItemCount())
+        ]
+        assert len(rows) == 6
+        by_stat_id = {row.data(0, Qt.UserRole): row for row in rows}
+        haste = by_stat_id["explicit.stat_2806391472"]
+        assert haste.text(3) == (
+            "ヘイストの影響を受けている時にテンポラルチェーンの影響を受けない"
+        )
+        haste_checkbox = window.mod_filter_tree.itemWidget(
+            haste, 0
+        ).findChild(QCheckBox, "modFilterCheckbox")
+        assert haste_checkbox is not None
+    finally:
+        window.close()
+
+
 @pytest.mark.parametrize(("group_type", "group_key", "group_min"), [
     ("and", None, None),
     ("not", "valdo-lethal", None),
