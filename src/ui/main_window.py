@@ -4035,7 +4035,7 @@ class MainWindow(QMainWindow):
                 dx = gpos.x() - self._ef_resize_start_pos.x()
                 dy = gpos.y() - self._ef_resize_start_pos.y()
                 x, y, w, h = geo.x(), geo.y(), geo.width(), geo.height()
-                min_w, min_h = 300, getattr(self, 'MIN_HEIGHT', 400)
+                min_w, min_h = 300, self._main_window_min_height()
                 
                 if 'right' in self._ef_resize_edge:
                     w = max(min_w, geo.width() + dx)
@@ -4406,6 +4406,7 @@ class MainWindow(QMainWindow):
         global_controls_layout = QHBoxLayout(self.global_controls_widget)
         global_controls_layout.setContentsMargins(0, 0, 0, 0)
         global_controls_layout.setSpacing(10)
+        global_controls_layout.addStretch()
 
         self.memo_btn = QPushButton("📝")
         self.memo_btn.setStyleSheet(Styles.BUTTON)
@@ -6840,6 +6841,20 @@ class MainWindow(QMainWindow):
     
     # --- ウィンドウ移動 & 下端リサイズ ---
     MIN_HEIGHT = 400
+    DETACHED_ONLY_MIN_HEIGHT = 90
+
+    def _main_window_min_height(self) -> int:
+        """表示対象の全パネルを切り離した本体だけ、操作列相当まで縮小可能にする。"""
+        registry = getattr(self, "panel_registry", {})
+        relevant_panels = {
+            panel_id
+            for panel_id in registry
+            if panel_id != "gem" or getattr(self, "poe_version", POE1) == POE1
+        }
+        detached_panels = set(getattr(self, "detached_panel_windows", {}))
+        if relevant_panels and relevant_panels.issubset(detached_panels):
+            return self.DETACHED_ONLY_MIN_HEIGHT
+        return self.MIN_HEIGHT
     
     def _detect_edge(self, pos):
         """マウス位置からリサイズ方向を検出"""
@@ -6891,7 +6906,7 @@ class MainWindow(QMainWindow):
             geo = self.resize_start_geo
             x, y, w, h = geo.x(), geo.y(), geo.width(), geo.height()
             min_w = 300
-            min_h = self.MIN_HEIGHT if hasattr(self, 'MIN_HEIGHT') else 400
+            min_h = self._main_window_min_height()
             
             if 'right' in self.resize_edge:
                 w = max(min_w, geo.width() + dx)

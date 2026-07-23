@@ -319,3 +319,25 @@ def test_detaching_timer_keeps_global_controls_in_main_and_timer_controls_detach
 
     assert main_layout.indexOf(timer_panel) == 0
     assert timer_button_layout.indexOf(global_controls) >= 0
+
+
+def test_main_window_can_shrink_to_control_row_when_all_visible_panels_are_detached():
+    _app()
+    window = MainWindow.__new__(MainWindow)
+    QMainWindow.__init__(window)
+    timer = QWidget()
+    guide = QWidget()
+    window.panel_registry = {
+        "timer": {"content": timer},
+        "guide": {"content": guide},
+    }
+    window.detached_panel_windows = {
+        "timer": QWidget(),
+        "guide": QWidget(),
+    }
+
+    assert window._main_window_min_height() == window.DETACHED_ONLY_MIN_HEIGHT
+
+    window.detached_panel_windows.pop("guide")
+
+    assert window._main_window_min_height() == window.MIN_HEIGHT
