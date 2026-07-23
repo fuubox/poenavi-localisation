@@ -3,7 +3,7 @@ import os
 os.environ.setdefault("QT_QPA_PLATFORM", "minimal")
 
 from PySide6.QtCore import QPoint, Qt
-from PySide6.QtWidgets import QApplication, QMainWindow, QSizePolicy, QSplitter, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QApplication, QMainWindow, QPushButton, QSizePolicy, QSplitter, QVBoxLayout, QWidget
 
 from src.ui.detached_panel import DetachedPanelWindow
 from src.ui.main_window import MainWindow
@@ -216,15 +216,21 @@ def test_collapsing_lap_content_shrinks_the_detached_timer_to_its_contents():
     panel_window.close()
 
 
-def test_collapsing_lap_removes_its_visible_height_from_a_detached_timer():
+def test_toggle_lap_hides_lap_content_in_a_detached_timer(monkeypatch):
     _app()
-    panel_window = DetachedPanelWindow("timer", "タイマー", QWidget(), lambda *_args: None, lambda *_args: None)
-    panel_window.show()
-    panel_window.resize(640, 720)
     window = MainWindow.__new__(MainWindow)
-    window.detached_panel_windows = {"timer": panel_window}
+    window.lap_expanded = True
+    window.lap_content = QWidget()
+    window.lap_content.show()
+    window.lap_toggle_btn = QPushButton()
+    window.config = {}
+    window.detached_panel_windows = {"timer": QWidget()}
+    window._adjust_detached_panel_height = lambda _panel_id: None
+    window._fit_detached_panel_height = lambda _panel_id: None
+    monkeypatch.setattr(ConfigManager, "save_config", lambda _config: None)
 
-    MainWindow._fit_detached_panel_height(window, "timer", removed_height=300)
+    window.toggle_lap()
 
-    assert panel_window.height() <= 420
-    panel_window.close()
+    assert not window.lap_expanded
+    assert window.lap_content.isHidden()
+    assert window.lap_toggle_btn.text() == "▶ ラップタイム"

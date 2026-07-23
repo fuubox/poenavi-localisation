@@ -4912,22 +4912,16 @@ class MainWindow(QMainWindow):
         if required_height > panel_window.height():
             panel_window.resize(panel_window.width(), required_height)
 
-    def _fit_detached_panel_height(self, panel_id: str, removed_height: int = 0):
+    def _fit_detached_panel_height(self, panel_id: str):
         """折りたたみ後の内容量に合わせて、切り離しパネルの余白を除去する。"""
         panel_window = self.detached_panel_windows.get(panel_id)
         if panel_window is None:
             return
 
         panel_window.content.updateGeometry()
-        content_layout = panel_window.content.layout()
-        if content_layout is not None:
-            content_layout.invalidate()
-            content_layout.activate()
         panel_window.layout().activate()
         required_height = max(panel_window.minimumHeight(), panel_window.sizeHint().height())
-        if removed_height > 0:
-            required_height = min(required_height, panel_window.height() - removed_height)
-        panel_window.resize(panel_window.width(), max(panel_window.minimumHeight(), required_height))
+        panel_window.resize(panel_window.width(), required_height)
 
     def _adjust_panel_or_main(self, panel_id: str):
         if self._is_panel_detached(panel_id):
@@ -5161,7 +5155,6 @@ class MainWindow(QMainWindow):
     
     def toggle_lap(self):
         """ラップタイム表示の折りたたみ/展開"""
-        collapsing_height = self.lap_content.height() if self.lap_expanded else 0
         self.lap_expanded = not self.lap_expanded
         self.lap_content.setVisible(self.lap_expanded)
         self.lap_toggle_btn.setText("▼ ラップタイム" if self.lap_expanded else "▶ ラップタイム")
@@ -5171,7 +5164,7 @@ class MainWindow(QMainWindow):
             if self.lap_expanded:
                 self._adjust_detached_panel_height("timer")
             else:
-                self._fit_detached_panel_height("timer", collapsing_height)
+                self._fit_detached_panel_height("timer")
         else:
             self._adjust_height_keep_width()
     
