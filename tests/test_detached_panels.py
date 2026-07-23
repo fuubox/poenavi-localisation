@@ -129,6 +129,11 @@ def test_detached_panel_detects_every_resize_edge_and_corner():
     panel_window.close()
 
 
+def test_detached_panel_maps_resize_edges_to_qt_edges():
+    assert DetachedPanelWindow._qt_resize_edges(frozenset(("left", "top"))) == Qt.LeftEdge | Qt.TopEdge
+    assert DetachedPanelWindow._qt_resize_edges(frozenset(("right", "bottom"))) == Qt.RightEdge | Qt.BottomEdge
+
+
 def test_detached_panel_resizes_from_top_left_without_moving_opposite_corner():
     _app()
     panel_window = DetachedPanelWindow("timer", "タイマー", QWidget(), lambda *_args: None, lambda *_args: None)
@@ -283,7 +288,8 @@ def test_detached_panel_applies_main_window_settings():
     assert panel_window.windowFlags() & Qt.WindowStaysOnTopHint
     assert panel_window.window_locked
     assert not panel_window.resize_grip.isVisible()
-    assert panel_window.content.graphicsEffect().opacity() == 0.6
+    assert panel_window.header.graphicsEffect().opacity() == 0.6
+    assert panel_window.content.graphicsEffect() is None
     panel_window.close()
 
 

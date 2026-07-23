@@ -22,6 +22,7 @@ class DetachedPanelWindow(QWidget):
         self._resize_start_position = None
         self._resize_start_geometry = None
         self._resize_margin = 8
+        self._native_resize_active = False
         self.window_locked = False
         self._content_size_policy = content.sizePolicy()
         self.setWindowFlags(Qt.Tool | Qt.FramelessWindowHint)
@@ -95,6 +96,26 @@ class DetachedPanelWindow(QWidget):
             return Qt.SizeVerCursor
         return Qt.ArrowCursor
 
+    @staticmethod
+    def _qt_resize_edges(edges: frozenset[str]):
+        qt_edges = Qt.Edges()
+        if "left" in edges:
+            qt_edges |= Qt.LeftEdge
+        if "right" in edges:
+            qt_edges |= Qt.RightEdge
+        if "top" in edges:
+            qt_edges |= Qt.TopEdge
+        if "bottom" in edges:
+            qt_edges |= Qt.BottomEdge
+        return qt_edges
+
+    def _start_native_resize(self, edges: frozenset[str]) -> bool:
+        """Qt/OSのネイティブリサイズを開始し、描画中の同期setGeometryを避ける。"""
+        handle = self.windowHandle()
+        if handle is None:
+            return False
+        return bool(handle.startSystemResize(self._qt_resize_edges(edges)))
+
     def _resize_from_global_position(self, global_position: QPoint):
         if self._resize_start_position is None or self._resize_start_geometry is None:
             return
@@ -119,10 +140,16 @@ class DetachedPanelWindow(QWidget):
         self.window_locked = bool(config.get("window_locked", False))
         self.setWindowOpacity(max(0.05, min(1.0, config.get("window_opacity", 100) / 100)))
         text_opacity = max(0.0, min(1.0, config.get("text_opacity", 100) / 100))
-        for widget in (self.header, self.content):
-            effect = QGraphicsOpacityEffect(widget)
+        # content配下には本体側で既に透過効果が設定されているウィジェットがある。
+        # 親contentにも効果を重ねると、切り離し・リサイズ時にQtの描画が再入して
+        # QPainter警告が連続するため、独立ヘッダーだけへ適用する。
+        if text_opacity < 1.0:
+            effect = QGraphicsOpacityEffect(self.header)
             effect.setOpacity(text_opacity)
-            widget.setGraphicsEffect(effect)
+            self.header.setGraphicsEffect(effect)
+        else:
+            self.header.setGraphicsEffect(None)
+        self.content.setGraphicsEffect(None)
         self.resize_grip.setVisible(not self.window_locked)
         flags = Qt.Tool | Qt.FramelessWindowHint
         if config.get("always_on_top", True):
@@ -148,6 +175,9 @@ class DetachedPanelWindow(QWidget):
             if event.type() == QEvent.MouseButtonPress and event.button() == Qt.LeftButton:
                 edges = self._resize_edges_at(global_position)
                 if not self.window_locked and edges:
+                    if self._start_native_resize(edges):
+                        self._native_resize_active = True
+                        return True
                     self._resize_edges = edges
                     self._resize_start_position = global_position
                     self._resize_start_geometry = QRect(self.geometry())
@@ -164,6 +194,10 @@ class DetachedPanelWindow(QWidget):
                 self._resize_edges = frozenset()
                 self._resize_start_position = None
                 self._resize_start_geometry = None
+                self._state_callback(self.panel_id, True)
+                return True
+            elif event.type() == QEvent.MouseButtonRelease and self._native_resize_active:
+                self._native_resize_active = False
                 self._state_callback(self.panel_id, True)
                 return True
 
