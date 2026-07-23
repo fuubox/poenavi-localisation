@@ -4136,7 +4136,6 @@ class MainWindow(QMainWindow):
         self.segment_summary_label.setStyleSheet(
             f"color: {Styles.TEXT_COLOR}; font-size: 10px; padding: 2px 0;"
         )
-        timer_content_layout.addWidget(self.segment_summary_label)
 
         # フォント読み込みと適用
         self._custom_font_family = self.load_custom_font()
@@ -5489,6 +5488,9 @@ class MainWindow(QMainWindow):
 
             self.lap_content_layout.addLayout(lap_layout)
             self.lap_label_widgets.append((act_label, time_label, split_label))
+
+        if hasattr(self, "segment_summary_label"):
+            self.lap_content_layout.addWidget(self.segment_summary_label)
 
     def _refresh_current_lap_index(self):
         for idx, lap in enumerate(self.lap_times, start=1):
