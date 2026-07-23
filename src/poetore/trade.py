@@ -635,10 +635,12 @@ def _apply_dedicated_exact_rules(
     enable_all = item.category in {"memory_line", "sanctum_relic", "charm"}
     blighted_map = _map_blight_state(item) is not None
     for row in filters:
+        # AwakenedのcreateExactStatFiltersはBlighted Mapのstat条件を空にし、
+        # Map本体のTier・Blighted種別だけをitem filterとして扱う。
         if blighted_map and row.stat_id not in {
             "property.map_tier", "property.map_blighted", "property.map_uberblighted",
             "property.map_completion_reward",
-        } and row.kind in {"map", "map pseudo", "map safety", "prefix", "suffix", "explicit"}:
+        }:
             continue
         if row.kind in keep_modifier_kinds or row.kind in special_kinds:
             enabled = row.enabled
@@ -1618,6 +1620,10 @@ def unresolved_modifier_warnings(
     resolved_filters: tuple[TradeStatFilter, ...] = (),
 ) -> tuple[str, ...]:
     """派生メタデータでも公式API照合でも未解決のModだけを返す。"""
+    # Blighted MapはAwakened同様、rolled Modやブライト固有暗黙Modを
+    # stat検索しないため、解決対象外のModを警告しない。
+    if _map_blight_state(item) is not None:
+        return ()
     resolved_lines = {
         _normalized_stat_text(line)
         for row in resolved_filters

@@ -2191,6 +2191,47 @@ def test_map_properties_blight_and_valdo_safety_filters():
     assert map_filters["map_completion_reward"] == {"option": "Mageblood"}
 
 
+def test_blighted_map_ignores_all_map_mods_and_unresolved_warnings():
+    item = parse_item_text("""アイテムクラス: マップ
+レアリティ: レア
+Glyph Stone
+Blighted Map (Tier 16)
+--------
+マップエリア: 干上がった海
+アイテム数量: +75% (augmented)
+アイテムレアリティ: +45% (augmented)
+モンスターパックサイズ: +29% (augmented)
+--------
+アイテムレベル: 83
+--------
+モンスターレベル：83
+--------
+{ 暗黙モッド }
+エリアは真菌に覆われている
+マップのアイテムの数量のモッドはその数値の20%がブライトチェストにも影響する
+3回アノイントすることができる — スケールできない値
+このエリアに元々生息していた生物はいなくなる — スケールできない値
+--------
+{ プレフィックスモッド「多様な」 (ティア: 1) }
+エリアのモンスターの種類が増える — スケールできない値
+{ プレフィックスモッド「装甲付き」 (ティア: 1) — 物理 }
+モンスターの物理ダメージ軽減率 +40%
+{ プレフィックスモッド「電撃の」 (ティア: 1) — ダメージ, 物理, 元素, 雷 }
+モンスターは物理ダメージの97(90-110)%を追加雷ダメージとして与える
+{ サフィックスモッド 「耐久力の」 (ティア: 1) }
+モンスターはヒット時にエンデュランスチャージを1個獲得する
+{ サフィックスモッド 「虐殺の」 (ティア: 1) }
+モンスターはアタックによるヒット時に重傷を付与する
+{ サフィックスモッド 「干魃の」 (ティア: 1) }
+全てのプレイヤーの獲得フラスコチャージが50%減少する
+""")
+    filters = resolve_trade_stat_filters(item)
+    assert {row.stat_id for row in filters} == {
+        "property.map_tier", "property.map_blighted",
+    }
+    assert unresolved_modifier_warnings(item, filters) == ()
+
+
 def test_valdo_reward_and_multiline_mods_use_official_exact_filters():
     item = parse_item_text("""アイテムクラス: マップ
 レアリティ: レア

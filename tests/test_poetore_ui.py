@@ -624,6 +624,34 @@ Unknown Experimental Modifier 123
         window.close()
 
 
+def test_blighted_map_does_not_warn_about_ignored_map_mods(qapp):
+    window = PoetoreWindow()
+    try:
+        window.input_edit.setPlainText("""アイテムクラス: マップ
+レアリティ: レア
+Glyph Stone
+Blighted Map (Tier 16)
+--------
+アイテムレベル: 83
+--------
+{ 暗黙モッド }
+エリアは真菌に覆われている
+マップのアイテムの数量のモッドはその数値の20%がブライトチェストにも影響する
+3回アノイントすることができる — スケールできない値
+このエリアに元々生息していた生物はいなくなる — スケールできない値
+--------
+{ プレフィックスモッド「多様な」 (ティア: 1) }
+エリアのモンスターの種類が増える — スケールできない値
+""")
+        window.parse_current_text()
+        assert window.mod_warning.isHidden()
+        assert window.mod_filter_tree.topLevelItemCount() == 0
+        assert window.map_tier_chip.values() == (16.0, None)
+        assert window.blighted_chip.text() == "ブライトマップ"
+    finally:
+        window.close()
+
+
 def test_inscribed_ultimatum_shows_unsupported_condition_notice(qapp):
     window = PoetoreWindow()
     try:
