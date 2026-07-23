@@ -36,6 +36,18 @@ class MiniNaviSpacePreservationTest(unittest.TestCase):
 
         self.assertEqual(result["text"], "▸親行\n\u00a0\u00a0└ 子行")
 
+    def test_get_mini_navi_content_returns_all_lines_without_a_limit(self):
+        guide = {
+            "mini_navi": {
+                "text": "一行目\n二行目\n三行目\n四行目\n五行目",
+                "direction": "none",
+            }
+        }
+
+        result = get_mini_navi_content(guide, max_lines=None)
+
+        self.assertEqual(result["text"].splitlines(), ["一行目", "二行目", "三行目", "四行目", "五行目"])
+
     @unittest.skipIf(MiniNaviOverlay is None, f"GUI dependencies unavailable: {IMPORT_ERROR}")
     def test_render_line_preserves_spaces_without_breaking_span_tags(self):
         overlay = MiniNaviOverlay.__new__(MiniNaviOverlay)

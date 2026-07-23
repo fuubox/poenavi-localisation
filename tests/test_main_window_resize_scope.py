@@ -3,7 +3,7 @@ import os
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtCore import QPoint, QRect
-from PySide6.QtWidgets import QApplication, QMainWindow, QWidget
+from PySide6.QtWidgets import QApplication, QLabel, QMainWindow, QVBoxLayout, QWidget
 
 from src.ui.main_window import MainWindow
 
@@ -44,3 +44,17 @@ def test_edge_detection_rejects_points_outside_main_window_even_when_axis_matche
     assert window._global_detect_edge(QPoint(geo.left(), geo.top() - 300)) is None
 
     window.deleteLater()
+
+
+def test_rebuild_lap_ui_keeps_segment_summary_inside_collapsible_lap_content():
+    _app()
+    lap_content = QWidget()
+    window = MainWindow.__new__(MainWindow)
+    window.lap_content_layout = QVBoxLayout(lap_content)
+    window.lap_labels = ["Act 1"]
+    window.segment_summary_label = QLabel("区間: エリア移動を待機中")
+
+    window._rebuild_lap_ui()
+
+    assert window.lap_content_layout.indexOf(window.segment_summary_label) == window.lap_content_layout.count() - 1
+    lap_content.deleteLater()

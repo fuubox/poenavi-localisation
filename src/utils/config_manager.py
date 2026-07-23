@@ -14,7 +14,7 @@ class ConfigManager:
     DEFAULT_CONFIG_FILE = "default_config.json"
     APP_NAME = "PoENavi"
     ENV_USER_DATA_DIR = "POENAVI_USER_DATA_DIR"
-    CURRENT_SCHEMA_VERSION = 2
+    CURRENT_SCHEMA_VERSION = 3
     POE1_ROUTE_ACT3_DEFAULT = "library_detour"
     POE1_ROUTE_ACT8_DEFAULT = "standard"
     POE1_ROUTE_ACT3_OLD_DEFAULT = "library_detour"
@@ -391,6 +391,11 @@ class ConfigManager:
                 if mini_navi.get("font_size") == 16:
                     mini_navi["font_size"] = 18
 
+        if schema_version < 3:
+            mini_navi = migrated.get("mini_guide_overlay")
+            if isinstance(mini_navi, dict):
+                mini_navi.setdefault("display_mode", "standard")
+
         if "poe1_route_selected" not in migrated:
             migrated["poe1_route_selected"] = cls._infer_poe1_route_selected(config)
 
@@ -483,4 +488,11 @@ class ConfigManager:
         default_config = cls._load_default_config_template()
         config = cls._migrate_config(cls._deep_merge(default_config, config))
         config = cls.migrate_pob_import_data_from_config(config)
-        cls._write_json(cls._get_config_path(), config)
+        config_path = Path(cls._get_config_path())
+        if config_path.exists():
+            try:
+                if cls._read_json(config_path) == config:
+                    return
+            except Exception:
+                pass
+        cls._write_json(config_path, config)

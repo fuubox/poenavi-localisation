@@ -115,6 +115,8 @@ class MapImageDialog(QDialog):
     
     def __init__(self, image_path: str, all_paths: list[str] = None, poe_version: str = "PoE1", parent=None):
         super().__init__(parent)
+        # 本体が最小化・非表示でも、画像ビューアを閉じただけでアプリを終了させない。
+        self.setAttribute(Qt.WA_QuitOnClose, False)
         self.image_path = image_path
         self.poe_version = poe_version
         self.all_paths = all_paths or [image_path]

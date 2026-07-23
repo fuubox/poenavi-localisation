@@ -1936,6 +1936,23 @@ class SettingsDialog(QDialog):
         mini_navi_window_layout.setSpacing(10)
 
         mini_navi_config = self.current_config.get("mini_guide_overlay", {})
+        mini_navi_display_mode_row = QHBoxLayout()
+        mini_navi_display_mode_label = QLabel("表示形式:")
+        mini_navi_display_mode_label.setStyleSheet(f"color: {Styles.TEXT_COLOR}; font-size: 12px;")
+        mini_navi_display_mode_row.addWidget(mini_navi_display_mode_label)
+        self.mini_navi_display_mode_combo = QComboBox()
+        self.mini_navi_display_mode_combo.addItem("標準", "standard")
+        self.mini_navi_display_mode_combo.addItem("コンパクト", "compact")
+        display_mode = mini_navi_config.get("display_mode", "standard") if isinstance(mini_navi_config, dict) else "standard"
+        self.mini_navi_display_mode_combo.setCurrentIndex(
+            max(0, self.mini_navi_display_mode_combo.findData(display_mode))
+        )
+        self.mini_navi_display_mode_combo.setFixedWidth(120)
+        self.mini_navi_display_mode_combo.setStyleSheet(combo_style)
+        mini_navi_display_mode_row.addWidget(self.mini_navi_display_mode_combo)
+        mini_navi_display_mode_row.addStretch()
+        mini_navi_window_layout.addLayout(mini_navi_display_mode_row)
+
         mini_navi_font_size = int(mini_navi_config.get("font_size", 15)) if isinstance(mini_navi_config, dict) else 15
         mini_navi_font_row = QHBoxLayout()
         mini_navi_font_label = QLabel("フォントサイズ:")
@@ -2653,6 +2670,7 @@ class SettingsDialog(QDialog):
             return text.strip().strip('"').strip("'").strip()
         
         mini_navi_overlay_config = dict(self.current_config.get("mini_guide_overlay", {}))
+        mini_navi_overlay_config["display_mode"] = self.mini_navi_display_mode_combo.currentData()
         mini_navi_overlay_config["font_size"] = self.mini_navi_font_size_combo.currentData()
         mini_navi_overlay_config["window_opacity"] = self.mini_navi_window_opacity_slider.value()
         mini_navi_overlay_config["text_opacity"] = self.mini_navi_text_opacity_slider.value()

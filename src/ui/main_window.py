@@ -7,15 +7,19 @@ import time
 from pynput import keyboard as pynput_keyboard
 from PySide6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
                                QLabel, QPushButton, QMenu, QFrame, QScrollArea, QSplitter,
-                               QSizeGrip, QMessageBox, QRadioButton, QButtonGroup, QApplication)
+                               QSizeGrip, QSizePolicy, QMessageBox, QRadioButton, QButtonGroup, QApplication)
 from PySide6.QtCore import Qt, QTimer, Signal, QRect, QEvent, QEventLoop, QPoint, QSize, QMimeData, QUrl
 from PySide6.QtGui import QCursor, QMouseEvent, QIcon, QDesktopServices
 from src.ui.styles import Styles
+from src.ui.detached_panel import DetachedPanelWindow
 from src.ui.settings_dialog import AreaNoteDialog, SettingsDialog
 from src.ui.map_viewer import MapThumbnailWidget
 from src.utils.config_manager import ConfigManager
 from src.utils.lap_recorder import LapRecorder
+from src.utils.segment_recorder import SegmentRecorder
 from src.utils.log_watcher import LogWatcher
+from src.utils.log_path_detector import fill_missing_client_log_paths
+from src.utils.performance_metrics import measure
 from src.utils.window_focus import get_foreground_window, focus_window, get_next_visible_window_after
 from src.utils.zone_lookup import get_zone_info, get_level_advice
 from src.utils.guide_data import load_guide_data, get_zone_guide, get_zone_guide_level, format_guide_html, get_mini_navi_content
@@ -120,6 +124,8 @@ class MiniNaviOverlay(QWidget):
     """みになび表示ウィンドウ。"""
 
     WAITING_FOR_AREA_TEXT = "エリアに入場すると攻略ガイドが表示されます"
+    COMPACT_DEFAULT_WIDTH = 390
+    COMPACT_DEFAULT_HEIGHT = 100
 
     DIRECTION_ARROWS = {
         "n": "⬆", "s": "⬇", "e": "➡", "w": "⬅",
@@ -143,6 +149,7 @@ class MiniNaviOverlay(QWidget):
 
     DEFAULT_CONFIG = {
         "enabled": False,
+        "display_mode": "standard",
         "locked": True,
         "click_through_when_locked": True,
         "opacity": 0.72,
@@ -262,9 +269,18 @@ class MiniNaviOverlay(QWidget):
         cfg = self.config()
         if refresh_window_flags:
             self._apply_window_flags()
-        self.resize(int(cfg.get("width", 800)), int(cfg.get("height", 130)))
-        pos = cfg.get("position", {}) if isinstance(cfg.get("position"), dict) else {}
-        self.move(int(pos.get("x", 80)), int(pos.get("y", 160)))
+        geometry = self._geometry_config()
+        if self.is_compact_mode() and not geometry:
+            default_geometry = self._compact_default_geometry()
+            self.resize(default_geometry.width(), default_geometry.height())
+            self.move(default_geometry.topLeft())
+        else:
+            self.resize(
+                int(geometry.get("width", cfg.get("width", 800))),
+                int(geometry.get("height", cfg.get("height", 130))),
+            )
+            pos = geometry.get("position", {}) if isinstance(geometry.get("position"), dict) else {}
+            self.move(int(pos.get("x", cfg.get("position", {}).get("x", 80))), int(pos.get("y", cfg.get("position", {}).get("y", 160))))
         self._show_strong_opacity(restart_fade=False)
         font_size = int(cfg.get("font_size", 18))
         window_opacity_pct = max(5, min(int(cfg.get("window_opacity", 100)), 100))
@@ -277,8 +293,20 @@ class MiniNaviOverlay(QWidget):
                 border-radius: 8px;
             }}
         """)
-        self.arrow_label.setStyleSheet("color: #FF69B4; font-size: 36px; font-weight: bold; line-height: 100%; background: transparent;")
-        self.exp_label.setStyleSheet("color: #ffffff; font-size: 15px; line-height: 110%; background: transparent;")
+        if self.is_compact_mode():
+            self.outer.layout().setContentsMargins(6, 5, 6, 5)
+            self.outer.layout().setSpacing(4)
+            self.arrow_label.setFixedSize(40, 24)
+            self.exp_label.setFixedWidth(40)
+            self.arrow_label.setStyleSheet("color: #FF69B4; font-size: 24px; font-weight: bold; line-height: 100%; background: transparent;")
+            self.exp_label.setStyleSheet("color: #ffffff; font-size: 10px; line-height: 110%; background: transparent;")
+        else:
+            self.outer.layout().setContentsMargins(10, 8, 12, 8)
+            self.outer.layout().setSpacing(8)
+            self.arrow_label.setFixedSize(118, 30)
+            self.exp_label.setFixedWidth(118)
+            self.arrow_label.setStyleSheet("color: #FF69B4; font-size: 36px; font-weight: bold; line-height: 100%; background: transparent;")
+            self.exp_label.setStyleSheet("color: #ffffff; font-size: 15px; line-height: 110%; background: transparent;")
         text_color = "#999999" if self._muted_content else "#ffffff"
         self.text_label.setStyleSheet(f"color: {text_color}; font-size: {font_size}px; line-height: 120%; background: transparent;")
         self._apply_text_opacity(int(cfg.get("text_opacity", 100)))
@@ -320,8 +348,10 @@ class MiniNaviOverlay(QWidget):
         text = mini_navi.get("text", "") or ""
         direction = mini_navi.get("direction", "none") or "none"
         # 既存configに max_lines=3 が保存されていても、みになび本文が欠けないよう最低4行は表示する。
-        max_lines = max(4, min(int(cfg.get("max_lines", 4)), 6))
-        lines = [line for line in text.splitlines() if line.strip()][:max_lines]
+        lines = [line for line in text.splitlines() if line.strip()]
+        if not self.is_compact_mode():
+            max_lines = max(4, min(int(cfg.get("max_lines", 4)), 6))
+            lines = lines[:max_lines]
         if not lines and direction not in self.DIRECTION_ARROWS:
             self.hide()
             self.lock_button_window.hide()
@@ -331,7 +361,7 @@ class MiniNaviOverlay(QWidget):
         self.arrow_label.setText(arrow)
         self.arrow_label.setVisible(bool(arrow))
         self.exp_label.setText(self._render_exp_guide(exp_guide))
-        self.exp_label.setVisible(bool(exp_guide))
+        self.exp_label.setVisible(bool(exp_guide) and not self.is_compact_mode())
         self.text_label.setAlignment(Qt.AlignCenter if muted else Qt.AlignVCenter | Qt.AlignLeft)
         self.text_label.setText("<br>".join(self._render_line(line) for line in lines))
         self.area_note_badge.setVisible(bool(has_area_note) and not muted)
@@ -388,6 +418,29 @@ class MiniNaviOverlay(QWidget):
         parent_config = getattr(self.main_window, "config", {}) if self.main_window else {}
         return parent_config.setdefault("mini_guide_overlay", {})
 
+    def is_compact_mode(self) -> bool:
+        return self.config().get("display_mode", "standard") == "compact"
+
+    def _geometry_config(self) -> dict:
+        config = self._mutable_config()
+        if self.is_compact_mode():
+            return config.setdefault("compact_geometry", {})
+        return config
+
+    def _available_screen_geometry(self) -> QRect:
+        screen = self.screen() or QApplication.primaryScreen()
+        if screen is not None:
+            return screen.availableGeometry()
+        return QRect(0, 0, self.COMPACT_DEFAULT_WIDTH, self.COMPACT_DEFAULT_HEIGHT)
+
+    def _compact_default_geometry(self) -> QRect:
+        available = self._available_screen_geometry()
+        width = min(self.COMPACT_DEFAULT_WIDTH, available.width())
+        height = min(self.COMPACT_DEFAULT_HEIGHT, available.height())
+        x = available.x() + (available.width() - width) // 2
+        y = available.bottom() - height + 1
+        return QRect(x, y, width, height)
+
     def _save_parent_config(self):
         if self.main_window and hasattr(self.main_window, "config"):
             ConfigManager.save_config(self.main_window.config)
@@ -407,7 +460,7 @@ class MiniNaviOverlay(QWidget):
             self.main_window.hide_for_mini_navi()
 
     def _remember_current_geometry_to_config(self):
-        cfg = self._mutable_config()
+        cfg = self._geometry_config()
         cfg["position"] = {"x": self.x(), "y": self.y()}
         cfg["width"] = self.width()
         cfg["height"] = self.height()
@@ -603,19 +656,44 @@ class MiniNaviOverlay(QWidget):
         """ウィンドウ幅に合わせて本文ラベル幅を更新する。"""
         if not hasattr(self, "text_label") or not hasattr(self, "arrow_label"):
             return
-        self.text_label.setFixedWidth(max(150, self.width() - self.arrow_label.width() - 72))
+        if not self.is_compact_mode():
+            self.text_label.setFixedWidth(max(150, self.width() - self.arrow_label.width() - 72))
+            return
+
+        left_width = max(
+            self.arrow_label.width() if self.arrow_label.isVisible() else 0,
+            self.exp_label.width() if self.exp_label.isVisible() else 0,
+        )
+        grip_width = self.size_grip.width() if self.size_grip.isVisible() else 0
+        visible_columns = int(left_width > 0) + int(grip_width > 0)
+        layout = self.outer.layout()
+        available_width = layout.contentsRect().width()
+        if available_width <= 0:
+            return
+        text_width = available_width - left_width - grip_width - layout.spacing() * visible_columns
+        self.text_label.setFixedWidth(max(1, text_width))
 
     def _fit_height_to_content(self):
         """フォントサイズ変更時に本文が切れない高さまで自動拡張する。"""
         self._update_text_width_for_current_size()
         self.text_label.adjustSize()
         margins = self.outer.layout().contentsMargins()
+        left_column_height = self.arrow_label.sizeHint().height()
+        if self.exp_label.isVisible():
+            left_column_height += self.exp_label.sizeHint().height()
         needed_height = max(
             self.minimumHeight(),
             self.text_label.sizeHint().height() + margins.top() + margins.bottom() + 14,
-            self.arrow_label.sizeHint().height() + self.exp_label.sizeHint().height() + margins.top() + margins.bottom() + 4,
+            left_column_height + margins.top() + margins.bottom() + 4,
         )
-        if needed_height > self.height():
+        if self.is_compact_mode():
+            available = self._available_screen_geometry()
+            self.resize(self.width(), min(needed_height, available.height()))
+            x = min(max(self.x(), available.left()), available.right() - self.width() + 1)
+            y = min(max(self.y(), available.top()), available.bottom() - self.height() + 1)
+            self.move(x, y)
+            self._sync_lock_button()
+        elif needed_height > self.height():
             self.resize(self.width(), needed_height)
             self._sync_lock_button()
 
@@ -3235,6 +3313,186 @@ class MainWindow(QMainWindow):
     poelab_url_resolved = Signal(str)
     poelab_url_failed = Signal(str)
 
+    def _detached_panel_config(self, panel_id: str) -> dict:
+        panels = self.config.setdefault("detached_panels", {})
+        return panels.setdefault(panel_id, {"detached": False})
+
+    def _is_panel_detached(self, panel_id: str) -> bool:
+        return panel_id in getattr(self, "detached_panel_windows", {})
+
+    def _save_detached_panel_state(self, panel_id: str, persist: bool = True):
+        state = self._detached_panel_config(panel_id)
+        panel_window = self.detached_panel_windows.get(panel_id)
+        state["detached"] = panel_window is not None
+        if panel_window is not None:
+            geometry = panel_window.geometry()
+            state.update({
+                "x": geometry.x(),
+                "y": geometry.y(),
+                "width": geometry.width(),
+                "height": geometry.height(),
+            })
+        if persist:
+            ConfigManager.save_config(self.config)
+            return
+        if not getattr(self, "_detached_state_save_scheduled", False):
+            self._detached_state_save_scheduled = True
+            QTimer.singleShot(250, self._flush_detached_panel_state)
+
+    def _flush_detached_panel_state(self):
+        self._detached_state_save_scheduled = False
+        ConfigManager.save_config(self.config)
+
+    def _detach_guide_lower_section(self):
+        """ガイドを外す際、マップ／ジェム領域は本体に残す。"""
+        if getattr(self, "_guide_lower_in_main", False):
+            return
+
+        lower_section = self.guide_lower_widget
+        self._guide_lower_splitter_sizes = self.guide_body_splitter.sizes()
+        lower_section.setParent(None)
+        guide_record = self.panel_registry["guide"]
+        guide_record["layout"].insertWidget(guide_record["index"] + 1, lower_section, 1)
+        self._guide_lower_in_main = True
+
+    def _restore_guide_lower_section(self):
+        """本体へ戻したガイドへ、下部領域を元のSplitter位置で戻す。"""
+        if not getattr(self, "_guide_lower_in_main", False):
+            return
+
+        lower_section = self.guide_lower_widget
+        self.panel_registry["guide"]["layout"].removeWidget(lower_section)
+        lower_section.setParent(None)
+        self.guide_body_splitter.insertWidget(1, lower_section)
+        sizes = getattr(self, "_guide_lower_splitter_sizes", None)
+        if isinstance(sizes, list) and len(sizes) == 2:
+            QTimer.singleShot(0, lambda: self.guide_body_splitter.setSizes(sizes))
+        self._guide_lower_in_main = False
+
+    def detach_panel(self, panel_id: str):
+        if panel_id in self.detached_panel_windows:
+            return
+
+        if panel_id == "guide":
+            self._detach_guide_lower_section()
+
+        record = self.panel_registry[panel_id]
+        content = record["content"]
+        record["layout"].removeWidget(content)
+        record["expanded_size_policies"] = {
+            widget: widget.sizePolicy() for widget in record.get("expand_widgets", ())
+        }
+        for widget in record.get("expand_widgets", ()):
+            widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        if record.get("detach_button") is not None:
+            record["detach_button"].hide()
+
+        panel_window = DetachedPanelWindow(
+            panel_id,
+            record["title"],
+            content,
+            self.restore_panel,
+            self._save_detached_panel_state,
+        )
+        self.detached_panel_windows[panel_id] = panel_window
+        panel_window.apply_window_settings(self.config)
+        panel_window.show()
+        self._save_detached_panel_state(panel_id)
+        self._adjust_height_keep_width()
+
+    def restore_panel(self, panel_id: str):
+        panel_window = self.detached_panel_windows.pop(panel_id, None)
+        if panel_window is None:
+            return
+
+        record = self.panel_registry[panel_id]
+        panel_window.layout().removeWidget(record["content"])
+        panel_window.restore_content_size_policy()
+        for widget, size_policy in record.pop("expanded_size_policies", {}).items():
+            widget.setSizePolicy(size_policy)
+        record["layout"].insertWidget(record["index"], record["content"], record.get("stretch", 0))
+        if panel_id == "guide":
+            self._restore_guide_lower_section()
+        if record.get("detach_button") is not None:
+            record["detach_button"].show()
+        panel_window._returning = True
+        panel_window.close()
+        panel_window.deleteLater()
+        self._save_detached_panel_state(panel_id)
+        self._adjust_height_keep_width()
+
+    def _register_detachable_panel(
+        self, panel_id: str, title: str, widgets: list[QWidget], layout, expand_widgets=(),
+    ):
+        """連続したUIを、初期化時に一つの移動可能なコンテナへまとめる。"""
+        index = layout.indexOf(widgets[0])
+        stretch = layout.stretch(index)
+        panel = QWidget()
+        panel.setAttribute(Qt.WA_StyledBackground, True)
+        panel_layout = QVBoxLayout(panel)
+        panel_layout.setContentsMargins(0, 0, 0, 0)
+        panel_layout.setSpacing(0)
+
+        detach_button = QPushButton("↗ 切り離す")
+        detach_button.setStyleSheet(Styles.BUTTON)
+        detach_button.setCursor(QCursor(Qt.PointingHandCursor))
+        detach_button.clicked.connect(lambda: self.detach_panel(panel_id))
+        panel_layout.addWidget(detach_button, alignment=Qt.AlignRight)
+
+        for widget in widgets:
+            layout.removeWidget(widget)
+            panel_layout.addWidget(widget, stretch=1 if widget in expand_widgets else 0)
+        layout.insertWidget(index, panel, stretch)
+        self.panel_registry[panel_id] = {
+            "content": panel,
+            "layout": layout,
+            "index": index,
+            "stretch": stretch,
+            "title": title,
+            "detach_button": detach_button,
+            "expand_widgets": tuple(expand_widgets),
+        }
+
+    def _restore_detached_panels(self):
+        for panel_id in tuple(self.panel_registry):
+            state = dict(self._detached_panel_config(panel_id))
+            if not state.get("detached", False):
+                continue
+
+            self.detach_panel(panel_id)
+            panel_window = self.detached_panel_windows[panel_id]
+            width, height = state.get("width"), state.get("height")
+            x, y = state.get("x"), state.get("y")
+            if (
+                isinstance(x, int) and isinstance(y, int)
+                and isinstance(width, int) and width >= 320
+                and isinstance(height, int) and height >= 180
+            ):
+                saved_geometry = QRect(x, y, width, height)
+                screens = QApplication.screens()
+                visible = any(screen.availableGeometry().intersects(saved_geometry) for screen in screens)
+                if visible:
+                    panel_window.setGeometry(saved_geometry)
+                elif screens:
+                    available = screens[0].availableGeometry()
+                    panel_window.setGeometry(
+                        available.center().x() - width // 2,
+                        available.center().y() - height // 2,
+                        width,
+                        height,
+                    )
+
+    def _close_detached_panels(self):
+        """アプリ終了時はパネルを本体へ戻さず閉じ、切り離し状態を保持する。"""
+        for panel_window in tuple(getattr(self, "detached_panel_windows", {}).values()):
+            self._save_detached_panel_state(panel_window.panel_id, persist=True)
+            panel_window._returning = True
+            panel_window.close()
+
+    def _apply_detached_panel_window_settings(self):
+        for panel_window in getattr(self, "detached_panel_windows", {}).values():
+            panel_window.apply_window_settings(self.config)
+
     def __init__(self):
         super().__init__()
 
@@ -3371,12 +3629,16 @@ class MainWindow(QMainWindow):
         self.lap_labels = get_lap_labels(self.poe_version)
         self.lap_times = [None] * len(self.lap_labels)
         self.lap_record_order = []
+        self.segment_recorder = SegmentRecorder()
         self.current_act = 1
         self.current_zone_act = 1  # 現在エリアから判定したAct（ジェム取得表示の自動追従用）
         self.gem_tracker_popup = None
         self._last_search_target_hwnd = None
+        self.panel_registry = {}
+        self.detached_panel_windows = {}
         
         self.setup_ui()
+        self._restore_detached_panels()
         self.map_thumbnail.auto_open = self.config.get("auto_open_map", False)
         self.map_thumbnail.auto_position = self.config.get("auto_position_map", True)
         self.setMouseTracking(True)
@@ -3391,11 +3653,12 @@ class MainWindow(QMainWindow):
         self._current_zone_name = ""
         self._current_area_note = ""
         self._current_poelab_type = None
-        zone_master_data = load_zone_master_data()
-        self.zone_data_by_version = zone_master_data["zone_data_by_version"]
-        self.town_zones_by_version = zone_master_data["town_zones_by_version"]
-        self.zone_data = self.zone_data_by_version.get(self.poe_version, {})
-        self.guide_data = load_guide_data(self.poe_version)
+        with measure("startup data load"):
+            zone_master_data = load_zone_master_data()
+            self.zone_data_by_version = zone_master_data["zone_data_by_version"]
+            self.town_zones_by_version = zone_master_data["town_zones_by_version"]
+            self.zone_data = self.zone_data_by_version.get(self.poe_version, {})
+            self.guide_data = load_guide_data(self.poe_version)
         self.mini_navi_overlay = MiniNaviOverlay(self)
         self.poelab_url_resolved.connect(self._open_resolved_poelab_url)
         self.poelab_url_failed.connect(self._handle_poelab_url_error)
@@ -3419,6 +3682,9 @@ class MainWindow(QMainWindow):
                 print(f"Failed to load monster_levels.json: {e}")
         
         # ログ監視
+        if fill_missing_client_log_paths(self.config):
+            ConfigManager.save_config(self.config)
+
         client_log_paths = self.config.get("client_log_paths", {})
         current_log_path = client_log_paths.get(self.poe_version, "")
         self.log_watcher = LogWatcher(
@@ -4048,6 +4314,13 @@ class MainWindow(QMainWindow):
         # 既存の layout.addWidget(self.timer_label) を置き換え
         timer_content_layout.addLayout(timer_layout)
 
+        self.segment_summary_label = QLabel()
+        self.segment_summary_label.setAlignment(Qt.AlignCenter)
+        self.segment_summary_label.setWordWrap(True)
+        self.segment_summary_label.setStyleSheet(
+            f"color: {Styles.TEXT_COLOR}; font-size: 10px; padding: 2px 0;"
+        )
+
         # フォント読み込みと適用
         self._custom_font_family = self.load_custom_font()
         print(f"Loaded font family: {self._custom_font_family}")
@@ -4593,6 +4866,18 @@ class MainWindow(QMainWindow):
             QTimer.singleShot(0, lambda sizes=saved_splitter_sizes: self.guide_body_splitter.setSizes(sizes))
         
         layout.addWidget(self.guide_container, stretch=1)
+
+        self._register_detachable_panel(
+            "timer", "タイマー", [self.timer_toggle_btn, self.timer_container], layout,
+        )
+        self._register_detachable_panel(
+            "guide", "ガイド", [self.guide_toggle_btn, self.guide_container], layout,
+            expand_widgets=(self.guide_container,),
+        )
+        self._register_detachable_panel(
+            "map", "マップ", [self.map_toggle_btn, self.map_thumbnail], guide_lower_layout,
+            expand_widgets=(self.map_thumbnail,),
+        )
         
         # 初期状態の反映
         self._apply_guide_visibility()
@@ -4619,6 +4904,35 @@ class MainWindow(QMainWindow):
         self.adjustSize()
         if self.width() != current_width:
             self.resize(current_width, self.height())
+
+    def _adjust_detached_panel_height(self, panel_id: str):
+        """切り離しパネルの展開内容を収めつつ、ユーザー指定サイズは維持する。"""
+        panel_window = self.detached_panel_windows.get(panel_id)
+        if panel_window is None:
+            return
+
+        panel_window.content.updateGeometry()
+        panel_window.layout().activate()
+        required_height = max(panel_window.minimumHeight(), panel_window.sizeHint().height())
+        if required_height > panel_window.height():
+            panel_window.resize(panel_window.width(), required_height)
+
+    def _fit_detached_panel_height(self, panel_id: str):
+        """折りたたみ後の内容量に合わせて、切り離しパネルの余白を除去する。"""
+        panel_window = self.detached_panel_windows.get(panel_id)
+        if panel_window is None:
+            return
+
+        panel_window.content.updateGeometry()
+        panel_window.layout().activate()
+        required_height = max(panel_window.minimumHeight(), panel_window.sizeHint().height())
+        panel_window.resize(panel_window.width(), required_height)
+
+    def _adjust_panel_or_main(self, panel_id: str):
+        if self._is_panel_detached(panel_id):
+            self._adjust_detached_panel_height(panel_id)
+        else:
+            self._adjust_height_keep_width()
 
     def _on_guide_body_splitter_moved(self, _pos: int, _index: int):
         """ガイドテキスト欄のドラッグ調整位置を保存する。"""
@@ -4842,7 +5156,7 @@ class MainWindow(QMainWindow):
             self.timer_size = restored_size
             self._apply_timer_size()
         ConfigManager.save_config(self.config)
-        self._adjust_height_keep_width()
+        self._adjust_panel_or_main("timer")
     
     def toggle_lap(self):
         """ラップタイム表示の折りたたみ/展開"""
@@ -4851,7 +5165,13 @@ class MainWindow(QMainWindow):
         self.lap_toggle_btn.setText("▼ ラップタイム" if self.lap_expanded else "▶ ラップタイム")
         self.config["lap_expanded"] = self.lap_expanded
         ConfigManager.save_config(self.config)
-        self._adjust_height_keep_width()
+        if self._is_panel_detached("timer"):
+            if self.lap_expanded:
+                self._adjust_detached_panel_height("timer")
+            else:
+                self._fit_detached_panel_height("timer")
+        else:
+            self._adjust_height_keep_width()
     
     def toggle_gem_tracker(self):
         """ジェム取得リストの折りたたみ/展開"""
@@ -5016,21 +5336,21 @@ class MainWindow(QMainWindow):
         # config保存
         self.config["guide_expanded"] = self.guide_expanded
         ConfigManager.save_config(self.config)
-        self._adjust_height_keep_width()
+        self._adjust_panel_or_main("guide")
     
     def toggle_zone_header(self):
         """ゾーンヘッダーの折りたたみ/展開"""
         self.zone_header_expanded = not self.zone_header_expanded
         self.guide_info_frame.setVisible(self.zone_header_expanded)
         self.zone_header_toggle_btn.setText("▼ ゾーン情報" if self.zone_header_expanded else "▶ ゾーン情報")
-        self._adjust_height_keep_width()
+        self._adjust_panel_or_main("guide")
     
     def toggle_guide_text(self):
         """ガイドテキストの折りたたみ/展開"""
         self.guide_text_expanded = not self.guide_text_expanded
         self.guide_text_frame.setVisible(self.guide_text_expanded)
         self.guide_text_toggle_btn.setText("▼ ガイドテキスト" if self.guide_text_expanded else "▶ ガイドテキスト")
-        self._adjust_height_keep_width()
+        self._adjust_panel_or_main("guide")
 
     def _update_poelab_link_visibility(self, zone_id: str | None):
         """本体ガイド欄のPoELabボタンを対象3エリアだけに表示する。"""
@@ -5176,7 +5496,7 @@ class MainWindow(QMainWindow):
         else:
             self.map_thumbnail.setVisible(False)
         self.map_toggle_btn.setText("▼ マップ" if self.map_section_expanded else "▶ マップ")
-        self._adjust_height_keep_width()
+        self._adjust_panel_or_main("map")
     
     def _apply_guide_visibility(self):
         """ガイドの表示/非表示を適用"""
@@ -5190,18 +5510,21 @@ class MainWindow(QMainWindow):
             self.zone_header_toggle_btn.setVisible(True)
             self.guide_text_toggle_btn.setVisible(True)
             self._refresh_guide_detail_level_toggle()
-            self.map_toggle_btn.setVisible(True)
+            if not self._is_panel_detached("map"):
+                self.map_toggle_btn.setVisible(True)
         else:
             # 全体折りたたみ時は3セクションすべて非表示
             self.guide_info_frame.setVisible(False)
             self.guide_text_frame.setVisible(False)
-            self.map_thumbnail.setVisible(False)
+            if not self._is_panel_detached("map") and not self._is_panel_detached("guide"):
+                self.map_thumbnail.setVisible(False)
             # サブトグルボタンも非表示
             self.zone_header_toggle_btn.setVisible(False)
             self.guide_text_toggle_btn.setVisible(False)
             if hasattr(self, "guide_detail_level_toggle_btn"):
                 self.guide_detail_level_toggle_btn.setVisible(False)
-            self.map_toggle_btn.setVisible(False)
+            if not self._is_panel_detached("map") and not self._is_panel_detached("guide"):
+                self.map_toggle_btn.setVisible(False)
         # 背景も連動
         if self.guide_expanded:
             self.guide_container.setStyleSheet("""
@@ -5218,6 +5541,13 @@ class MainWindow(QMainWindow):
             self.start_time = time.time()
             self.timer.start(10)
             self.is_running = True
+            if self.current_zone:
+                self.segment_recorder.record_entry(
+                    self._get_zone_id(self.current_zone) or self.current_zone,
+                    self.current_zone,
+                    self.get_elapsed_time(),
+                )
+                self._update_segment_summary()
             
     def stop_timer(self):
         if self.is_running:
@@ -5244,7 +5574,7 @@ class MainWindow(QMainWindow):
         # ラップ記録があれば保存
         if any(t is not None for t in self.lap_times):
             total = self.get_elapsed_time()
-            LapRecorder.save_run(self.lap_times, total)
+            LapRecorder.save_run(self.lap_times, total, segments=self.segment_recorder.segments)
         
         self.stop_timer()
         self.accumulated_time = 0.0
@@ -5256,6 +5586,7 @@ class MainWindow(QMainWindow):
         """全ラップをリセット"""
         self.lap_labels = get_lap_labels(self.poe_version)
         self.lap_times = [None] * len(self.lap_labels)
+        self.segment_recorder.reset()
         self.current_act = 1
         self.update_lap_display()
         # Part 1に戻す
@@ -5286,6 +5617,7 @@ class MainWindow(QMainWindow):
             "lap_times": self.lap_times,
             "lap_record_order": self.lap_record_order,
             "current_act": self.current_act,
+            "segments": getattr(self, "segment_recorder", SegmentRecorder()).segments,
         }
 
     def _save_timer_state_payload(self, payload):
@@ -5352,6 +5684,7 @@ class MainWindow(QMainWindow):
             self.lap_times.append(None)
         self.lap_record_order = [lap for lap in saved.get("lap_record_order", []) if 1 <= lap <= len(self.lap_labels)]
         self.current_act = saved.get("current_act", 1)
+        self.segment_recorder = SegmentRecorder(saved.get("segments", []))
         if self.accumulated_time > 0:
             self.update_text(self.accumulated_time)
             self.update_lap_display()
@@ -5390,6 +5723,9 @@ class MainWindow(QMainWindow):
             self.lap_content_layout.addLayout(lap_layout)
             self.lap_label_widgets.append((act_label, time_label, split_label))
 
+        if hasattr(self, "segment_summary_label"):
+            self.lap_content_layout.addWidget(self.segment_summary_label)
+
     def _refresh_current_lap_index(self):
         for idx, lap in enumerate(self.lap_times, start=1):
             if lap is None:
@@ -5410,7 +5746,7 @@ class MainWindow(QMainWindow):
         if self.current_act < len(self.lap_times):
             self.current_act += 1
         else:
-            LapRecorder.save_run(self.lap_times, elapsed)
+            LapRecorder.save_run(self.lap_times, elapsed, segments=self.segment_recorder.segments)
         
         self.update_lap_display()
         # ジェムトラッカーをAct変更に連動
@@ -5428,7 +5764,7 @@ class MainWindow(QMainWindow):
         if lap_num not in self.lap_record_order:
             self.lap_record_order.append(lap_num)
         if all(lap is not None for lap in self.lap_times):
-            LapRecorder.save_run(self.lap_times, elapsed)
+            LapRecorder.save_run(self.lap_times, elapsed, segments=self.segment_recorder.segments)
         else:
             self._refresh_current_lap_index()
         self.update_lap_display()
@@ -5464,9 +5800,31 @@ class MainWindow(QMainWindow):
             return f"{hours}:{mins:02d}:{secs:02d}.{cs:02d}"
         else:
             return f"{mins:02d}:{secs:02d}.{cs:02d}"
-    
+
+    def _update_segment_summary(self):
+        """直近区間と遅い区間をコンパクトに表示する。"""
+        if not hasattr(self, "segment_summary_label"):
+            return
+
+        summary = self.segment_recorder.summary()
+        latest = summary["latest"]
+        if not latest:
+            self.segment_summary_label.setText("区間: エリア移動を待機中")
+            return
+
+        latest_name = latest.get("zone_name") or latest.get("zone_id", "不明")
+        latest_text = f"直近: {latest_name} {self.format_lap_time(latest.get('duration', 0.0))}"
+        slowest_text = " / ".join(
+            f"{segment.get('zone_name') or segment.get('zone_id', '不明')} {self.format_lap_time(segment.get('duration', 0.0))}"
+            for segment in summary["slowest"]
+        )
+        self.segment_summary_label.setText(
+            f"{latest_text}\n遅い区間: {slowest_text}"
+        )
+
     def update_lap_display(self):
         """ラップタイム表示を更新"""
+        self._update_segment_summary()
         for i, (act_lbl, time_lbl, split_lbl) in enumerate(self.lap_label_widgets):
             act_name = self.lap_labels[i]
             lap_time = self.lap_times[i] if i < len(self.lap_times) else None
@@ -5974,6 +6332,10 @@ class MainWindow(QMainWindow):
             self.gem_tracker_popup.gem_tracker.set_current_act(act)
 
     def on_zone_entered(self, zone_name: str, actual_entry: bool = True):
+        with measure("zone update"):
+            return self._handle_zone_entered(zone_name, actual_entry)
+
+    def _handle_zone_entered(self, zone_name: str, actual_entry: bool = True):
         """エリア入場検知
 
         actual_entry=False はレベルアップ等による現在エリア表示の再評価用。
@@ -5987,6 +6349,13 @@ class MainWindow(QMainWindow):
             f"visited_town_before={getattr(self, '_visited_town', False)}"
         )
         self.current_zone = zone_name
+        if actual_entry and self.is_running and not self._restoring:
+            self.segment_recorder.record_entry(
+                self._get_zone_id(zone_name) or zone_name,
+                zone_name,
+                self.get_elapsed_time(),
+            )
+            self._update_segment_summary()
         if actual_entry and self.poe_version == POE2 and zone_name in ("川岸", "The Riverbank") and not self._restoring:
             self.clear_progress_flags()
             self.player_level = 1
@@ -6325,7 +6694,8 @@ class MainWindow(QMainWindow):
             if hasattr(self, "mini_navi_overlay"):
                 if self._is_mini_navi_available():
                     overlay_config = self.config.get("mini_guide_overlay", {})
-                    max_lines = overlay_config.get("max_lines", 4) if isinstance(overlay_config, dict) else 4
+                    display_mode = overlay_config.get("display_mode", "standard") if isinstance(overlay_config, dict) else "standard"
+                    max_lines = None if display_mode == "compact" else overlay_config.get("max_lines", 4)
                     self.mini_navi_overlay.update_content(
                         get_mini_navi_content(guide, max_lines=max_lines),
                         self._mini_navi_exp_guide(exp_level, zone_id=zone_id),
@@ -6717,6 +7087,7 @@ class MainWindow(QMainWindow):
             # 透過率更新
             self._apply_bg_opacity(self.config.get("window_opacity", 100))
             self._apply_text_opacity(self.config.get("text_opacity", 100))
+            self._apply_detached_panel_window_settings()
             if hasattr(self, "mini_navi_overlay"):
                 self.mini_navi_overlay.apply_settings(refresh_window_flags=True)
             # メモダイアログにも透過率を反映
@@ -6874,6 +7245,8 @@ class MainWindow(QMainWindow):
             }
             ConfigManager.save_config(config)
             self.config = config
+
+        self._close_detached_panels()
 
         # みになびは本体と独立したトップレベルウィンドウなので、アプリ終了時は
         # 明示的に一緒に閉じる。

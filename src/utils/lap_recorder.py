@@ -14,7 +14,7 @@ class LapRecorder:
             os.makedirs(cls.RUNS_DIR)
     
     @classmethod
-    def save_run(cls, lap_times: list, total_time: float) -> str:
+    def save_run(cls, lap_times: list, total_time: float, segments: list[dict] | None = None) -> str:
         """
         ラン記録を保存
         
@@ -42,6 +42,8 @@ class LapRecorder:
             "total_time": total_time,
             "laps": laps
         }
+        if segments:
+            data["segments"] = segments
         
         with open(filepath, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2, ensure_ascii=False)

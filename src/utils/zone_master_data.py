@@ -8,6 +8,7 @@ from src.utils.poe_version_data import POE1, POE2, get_town_zones
 from src.utils.zone_data_poe2 import DEFAULT_ZONE_DATA_POE2
 
 ZONE_MASTER_FILE = os.path.join("data", "zone_data.json")
+_ZONE_MASTER_CACHE: tuple[str, int, int, dict] | None = None
 
 
 def get_zone_master_dir() -> str:
@@ -40,10 +41,18 @@ def default_zone_master_data() -> dict:
 
 def load_zone_master_data() -> dict:
     """data/zone_data.json を読み込む。なければコード内デフォルトを返す。"""
+    global _ZONE_MASTER_CACHE
     path = get_zone_master_path()
     default = default_zone_master_data()
-    if not os.path.exists(path):
+    try:
+        stat = os.stat(path)
+        modified_ns = stat.st_mtime_ns
+        file_size = stat.st_size
+    except OSError:
         return default
+
+    if _ZONE_MASTER_CACHE and _ZONE_MASTER_CACHE[:3] == (path, modified_ns, file_size):
+        return _ZONE_MASTER_CACHE[3]
     try:
         with open(path, "r", encoding="utf-8") as f:
             data = json.load(f)
@@ -51,14 +60,17 @@ def load_zone_master_data() -> dict:
         print(f"[ZoneMasterData] Failed to load: {e}")
         return default
 
-    return {
+    result = {
         "zone_data_by_version": data.get("zone_data_by_version", default["zone_data_by_version"]),
         "town_zones_by_version": data.get("town_zones_by_version", default["town_zones_by_version"]),
     }
+    _ZONE_MASTER_CACHE = (path, modified_ns, file_size, result)
+    return result
 
 
 def save_zone_master_data(zone_data_by_version: dict, town_zones_by_version: dict) -> None:
     """ゾーン・街エリアのマスタデータを保存する。"""
+    global _ZONE_MASTER_CACHE
     path = get_zone_master_path()
     os.makedirs(os.path.dirname(path), exist_ok=True)
     data = {
@@ -67,6 +79,7 @@ def save_zone_master_data(zone_data_by_version: dict, town_zones_by_version: dic
     }
     with open(path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=4)
+    _ZONE_MASTER_CACHE = None
     print(f"[ZoneMasterData] Saved: {path}")
 
 
