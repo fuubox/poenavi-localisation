@@ -124,8 +124,8 @@ class MiniNaviOverlay(QWidget):
     """みになび表示ウィンドウ。"""
 
     WAITING_FOR_AREA_TEXT = "エリアに入場すると攻略ガイドが表示されます"
-    COMPACT_DEFAULT_WIDTH = 390
-    COMPACT_DEFAULT_HEIGHT = 100
+    COMPACT_DEFAULT_WIDTH = 600
+    COMPACT_DEFAULT_HEIGHT = 110
 
     DIRECTION_ARROWS = {
         "n": "⬆", "s": "⬇", "e": "➡", "w": "⬅",
