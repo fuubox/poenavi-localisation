@@ -379,6 +379,7 @@ def test_poetore_uses_wide_poena_theme_and_hides_debug_parse_area(qapp):
         assert not window._debug_parse_area.isVisible()
         assert window.mod_filter_tree.isColumnHidden(6)
         assert window.mod_filter_tree.columnCount() == 7
+        assert window.mod_filter_tree.header().isHidden()
         assert window.mod_filter_tree.headerItem().text(2) == "ティア"
         assert window.mod_filter_tree.headerItem().text(6) == "詳細"
         assert "論理" not in [

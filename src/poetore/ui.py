@@ -1106,6 +1106,7 @@ class PoetoreWindow(QWidget):
         self.mod_filter_tree.setAlternatingRowColors(True)
         self.mod_filter_tree.setMinimumHeight(230)
         mod_header = self.mod_filter_tree.header()
+        mod_header.hide()
         mod_header.setSectionResizeMode(_MOD_COLUMN_CHECK, QHeaderView.Fixed)
         self.mod_filter_tree.setColumnWidth(
             _MOD_COLUMN_CHECK, _MOD_CHECK_COLUMN_WIDTH
