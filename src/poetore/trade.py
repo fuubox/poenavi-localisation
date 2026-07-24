@@ -1732,10 +1732,23 @@ def unresolved_modifier_warnings(
         for line in row.text.splitlines()
         if line.strip()
     }
+    fixed_unique_refs = unique_fixed_stats(item.name) if _is_unique(item) else None
+
+    def should_warn(modifier) -> bool:
+        if modifier.stat_id is not None or modifier.kind in {"desecrated"}:
+            return False
+        if _normalized_stat_text(modifier.text) in resolved_lines:
+            return False
+        if _is_unique(item) and _unique_roll_bounds(modifier.text) is None:
+            # Awakenedのitems.ndjsonにfixedStatsがないUniqueでは、数値なしModを
+            # Variant検索候補として扱わない。SvalinnのLucky block等も警告不要。
+            if fixed_unique_refs is None or modifier.ref in fixed_unique_refs:
+                return False
+        return True
+
     return tuple(
         modifier.text for modifier in item.modifiers
-        if modifier.stat_id is None and modifier.kind not in {"desecrated"}
-        and _normalized_stat_text(modifier.text) not in resolved_lines
+        if should_warn(modifier)
     )
 
 
