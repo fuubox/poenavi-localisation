@@ -44,11 +44,16 @@ class PoeNinjaPrice:
     total_change: float | None = None
     source_type: str | None = None
 
-    def display_price(self) -> str:
+    def display_price_parts(self) -> tuple[str, str]:
         if self.divine_chaos and self.chaos >= self.divine_chaos * 0.94:
             value = self.chaos / self.divine_chaos
-            return f"{_display_number(value)} div"
-        return f"{_display_number(self.chaos)} chaos"
+            return _display_number(value), "divine"
+        return _display_number(self.chaos), "chaos"
+
+    def display_price(self) -> str:
+        amount, currency = self.display_price_parts()
+        suffix = "div" if currency == "divine" else currency
+        return f"{amount} {suffix}"
 
     def graph_points(self) -> tuple[float, ...]:
         return tuple(float(value) for value in self.graph if value is not None)

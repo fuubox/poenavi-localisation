@@ -45,10 +45,17 @@ def test_unique_price_uses_name_and_formats_divines():
         _payload(), item, "Standard", trade_name="Mageblood", trade_base_type="Heavy Belt",
     )
     assert price is not None
+    assert price.display_price_parts() == ("200", "divine")
     assert price.display_price() == "200 div"
     assert price.graph_points() == (0, 1, 2, 3, 4, 5, 6)
     assert "/unique-accessories/mageblood-4-flasks-heavy-belt" in price.url
     assert price.source_type == "UniqueAccessory"
+
+
+def test_small_price_uses_chaos_display_parts():
+    price = PoeNinjaPrice("Arc", None, 8.5, (), "https://example.com", 200)
+    assert price.display_price_parts() == ("8.5", "chaos")
+    assert price.display_price() == "8.5 chaos"
 
 
 def test_trend_summary_uses_signed_total_change_instead_of_graph_deviation():

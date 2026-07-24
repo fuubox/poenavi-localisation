@@ -1820,13 +1820,32 @@ def test_poe_ninja_price_panel_renders_price_trend_and_link(qapp):
         )
         window._show_poe_ninja_price(key, price)
         assert not window.poe_ninja_price_panel.isHidden()
-        assert window.poe_ninja_price_value.text() == "200 div"
+        assert window.poe_ninja_price_value.text() == "200"
+        assert not window.poe_ninja_currency_icon.pixmap().isNull()
+        assert window.poe_ninja_currency_icon.toolTip() == "Divine Orb"
+        assert window.poe_ninja_price_multiplier.text() == "×"
         assert "7日推移" in window.poe_ninja_trend_label.text()
         assert window.poe_ninja_trend_chart._points == (0, 1, 2, 3, 4, 5, 6)
         assert window._last_poe_ninja_url == "https://poe.ninja/example"
 
         window._hide_poe_ninja_price(key)
         assert window.poe_ninja_price_panel.isHidden()
+    finally:
+        window.close()
+
+
+def test_poe_ninja_price_panel_uses_chaos_icon_for_small_price(qapp):
+    window = PoetoreWindow()
+    try:
+        key = ("item", "Standard", "Arc", "Arc")
+        window._poe_ninja_item_key = key
+        window._show_poe_ninja_price(
+            key,
+            PoeNinjaPrice("Arc", None, 10, (), "https://poe.ninja/example", 200),
+        )
+        assert window.poe_ninja_price_value.text() == "10"
+        assert not window.poe_ninja_currency_icon.pixmap().isNull()
+        assert window.poe_ninja_currency_icon.toolTip() == "Chaos Orb"
     finally:
         window.close()
 

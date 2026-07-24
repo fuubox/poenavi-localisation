@@ -162,6 +162,24 @@ def _influence_chip_icon(label: str, active: bool) -> QIcon:
     return QIcon(result)
 
 
+_PRICE_CURRENCY_ICONS = {
+    "chaos": "ChaosOrb.png",
+    "divine": "DivineOrb.png",
+}
+
+
+def _asset_icon_path(filename: str) -> Path | None:
+    """開発実行・配布EXEのどちらでも同梱アイコンを解決する。"""
+    source_root = Path(__file__).resolve().parents[2]
+    executable_root = Path(sys.executable).resolve().parent
+    roots = (executable_root, Path(getattr(sys, "_MEIPASS", source_root)), source_root)
+    for root in roots:
+        path = root / "assets" / "icons" / filename
+        if path.is_file():
+            return path
+    return None
+
+
 class _FlowLayout(QLayout):
     """表示中の検索チップを利用可能な横幅で自動折り返しするレイアウト。"""
 
@@ -656,6 +674,12 @@ class PoetoreWindow(QWidget):
         self.poe_ninja_price_label.setObjectName("poeNinjaPriceLabel")
         self.poe_ninja_price_value = QLabel("—")
         self.poe_ninja_price_value.setObjectName("poeNinjaPriceValue")
+        self.poe_ninja_price_multiplier = QLabel("×")
+        self.poe_ninja_price_multiplier.setObjectName("poeNinjaPriceMultiplier")
+        self.poe_ninja_currency_icon = QLabel()
+        self.poe_ninja_currency_icon.setObjectName("poeNinjaCurrencyIcon")
+        self.poe_ninja_currency_icon.setFixedSize(28, 28)
+        self.poe_ninja_currency_icon.setAlignment(Qt.AlignCenter)
         self.poe_ninja_trend_label = QLabel("")
         self.poe_ninja_trend_label.setObjectName("poeNinjaTrendLabel")
         self.poe_ninja_trend_chart = _SparklineWidget()
@@ -666,6 +690,8 @@ class PoetoreWindow(QWidget):
         self.poe_ninja_open_button.clicked.connect(self._open_poe_ninja_url)
         ninja_layout.addWidget(self.poe_ninja_price_label)
         ninja_layout.addWidget(self.poe_ninja_price_value)
+        ninja_layout.addWidget(self.poe_ninja_price_multiplier)
+        ninja_layout.addWidget(self.poe_ninja_currency_icon)
         ninja_layout.addStretch()
         ninja_layout.addWidget(self.poe_ninja_trend_label)
         ninja_layout.addWidget(self.poe_ninja_trend_chart)
@@ -1125,6 +1151,7 @@ class PoetoreWindow(QWidget):
             }
             QLabel#poeNinjaPriceLabel { color: #91b87a; font-weight: 700; }
             QLabel#poeNinjaPriceValue { color: #f4ffed; font-size: 14px; font-weight: 700; }
+            QLabel#poeNinjaPriceMultiplier { color: #f4ffed; font-size: 13px; }
             QLabel#poeNinjaTrendLabel { color: #91b87a; font-size: 10px; }
             QPushButton#poeNinjaOpenButton { padding: 3px 7px; }
             QPushButton#leaguePopupButton {
@@ -1592,7 +1619,20 @@ class PoetoreWindow(QWidget):
     def _show_poe_ninja_price(self, key, price: PoeNinjaPrice):
         if key != self._poe_ninja_item_key:
             return
-        self.poe_ninja_price_value.setText(price.display_price())
+        amount, currency = price.display_price_parts()
+        self.poe_ninja_price_value.setText(amount)
+        icon_path = _asset_icon_path(_PRICE_CURRENCY_ICONS[currency])
+        pixmap = QPixmap(str(icon_path)) if icon_path else QPixmap()
+        self.poe_ninja_currency_icon.setPixmap(
+            pixmap.scaled(26, 26, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            if not pixmap.isNull() else QPixmap()
+        )
+        currency_name = "Divine Orb" if currency == "divine" else "Chaos Orb"
+        self.poe_ninja_currency_icon.setToolTip(currency_name)
+        self.poe_ninja_price_multiplier.setVisible(not pixmap.isNull())
+        self.poe_ninja_currency_icon.setVisible(not pixmap.isNull())
+        if pixmap.isNull():
+            self.poe_ninja_price_value.setText(price.display_price())
         trend = price.trend_summary()
         self.poe_ninja_trend_label.setText(
             f"{trend[0]} {trend[1]}\n7日推移" if trend else "7日データなし"
@@ -1606,6 +1646,9 @@ class PoetoreWindow(QWidget):
             return
         self.poe_ninja_price_panel.hide()
         self.poe_ninja_price_value.setText("—")
+        self.poe_ninja_price_multiplier.show()
+        self.poe_ninja_currency_icon.clear()
+        self.poe_ninja_currency_icon.setToolTip("")
         self.poe_ninja_trend_label.clear()
         self.poe_ninja_trend_chart.setPoints(())
         self._last_poe_ninja_url = ""
