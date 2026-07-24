@@ -346,7 +346,10 @@ class CheatSheetOverlay(QWidget):
         images = self.config["images"]
         if not images:
             self.title_label.setText("Cheat sheets")
-            self.image_label.setText("画像が登録されていません")
+            self.image_label.setText(
+                "画像が登録されていません\n\n"
+                "ぽえなび本体の「🖼」ボタンから画像を登録してください"
+            )
             self.counter_label.clear()
             self._pixmap = QPixmap()
             return

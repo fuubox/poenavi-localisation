@@ -52,6 +52,15 @@ def test_normalization_selects_first_available_image():
     assert config["selected_id"] == "first"
 
 
+def test_empty_overlay_guides_user_to_main_window_button(qapp):
+    overlay = CheatSheetOverlay({"images": []})
+
+    assert "画像が登録されていません" in overlay.image_label.text()
+    assert "🖼" in overlay.image_label.text()
+    assert "画像を登録してください" in overlay.image_label.text()
+    overlay.close()
+
+
 def test_manager_cancel_removes_only_newly_imported_files(qapp, tmp_path, monkeypatch):
     monkeypatch.setenv("POENAVI_USER_DATA_DIR", str(tmp_path / "user-data"))
     existing_source = tmp_path / "existing.png"

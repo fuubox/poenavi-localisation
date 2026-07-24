@@ -4469,7 +4469,7 @@ class MainWindow(QMainWindow):
         self.cheat_sheets_btn.setStyleSheet(Styles.BUTTON)
         self.cheat_sheets_btn.setFixedSize(35, 35)
         self._update_cheat_sheets_hotkey_tooltip()
-        self.cheat_sheets_btn.clicked.connect(self.toggle_cheat_sheets)
+        self.cheat_sheets_btn.clicked.connect(self.open_cheat_sheets_from_button)
         global_controls_layout.addWidget(self.cheat_sheets_btn)
         
         self.settings_btn = QPushButton("⚙")
@@ -7259,11 +7259,16 @@ class MainWindow(QMainWindow):
                 overlay.show()
                 overlay.raise_()
 
-    def toggle_cheat_sheets(self):
-        overlay = self._ensure_cheat_sheet_overlay()
+    def open_cheat_sheets_from_button(self):
+        """本体ボタンでは、未登録なら管理画面、登録済みなら表示を切り替える。"""
         if not self.config.get("cheat_sheets", {}).get("images"):
             self.open_cheat_sheet_manager()
             return
+        self.toggle_cheat_sheets()
+
+    def toggle_cheat_sheets(self):
+        """表示ホットキーでは、未登録案内を含むオーバーレイを切り替える。"""
+        overlay = self._ensure_cheat_sheet_overlay()
         overlay.toggle()
     
     def open_settings(self):
