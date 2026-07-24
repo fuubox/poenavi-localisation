@@ -60,6 +60,8 @@ def test_empty_overlay_guides_user_to_main_window_button(qapp):
     assert "画像が登録されていません" in overlay.image_label.text()
     assert "🖼" in overlay.image_label.text()
     assert "画像を登録してください" in overlay.image_label.text()
+    assert "rgba(0, 0, 0, 205)" in overlay.image_label.styleSheet()
+    assert "font-size: 20px" in overlay.image_label.styleSheet()
     assert "画像タイトルをドラッグで移動" in overlay.title_label.text()
     overlay.close()
 
@@ -105,6 +107,7 @@ def test_overlay_switches_images_and_saves_geometry(qapp, tmp_path, monkeypatch)
     overlay.config_changed.connect(saved.append)
 
     overlay.step_image(1)
+    assert "background: transparent" in overlay.image_label.styleSheet()
     overlay.setGeometry(40, 50, 600, 420)
     overlay.hide_and_save()
 

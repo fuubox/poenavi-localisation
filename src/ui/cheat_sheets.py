@@ -303,6 +303,7 @@ class CheatSheetOverlay(QWidget):
         self.image_label = QLabel()
         self.image_label.setAlignment(Qt.AlignCenter)
         self.image_label.setMinimumSize(200, 120)
+        self.image_label.setWordWrap(True)
         layout.addWidget(self.image_label, 1)
 
         nav = QHBoxLayout()
@@ -356,6 +357,17 @@ class CheatSheetOverlay(QWidget):
         images = self.config["images"]
         if not images:
             self.title_label.setText("Cheat sheets（画像タイトルをドラッグで移動）")
+            self.image_label.setStyleSheet(
+                "QLabel {"
+                " background: rgba(0, 0, 0, 205);"
+                " color: white;"
+                " border: 1px solid rgba(255, 255, 255, 110);"
+                " border-radius: 10px;"
+                " padding: 28px;"
+                " font-size: 20px;"
+                " font-weight: bold;"
+                "}"
+            )
             self.image_label.setText(
                 "画像が登録されていません\n\n"
                 "ぽえなび本体の「🖼」ボタンから画像を登録してください"
@@ -371,8 +383,22 @@ class CheatSheetOverlay(QWidget):
         self.counter_label.setText(f"{index + 1} / {len(images)}")
         self._pixmap = QPixmap(str(registered_image_path(record)))
         if self._pixmap.isNull():
+            self.image_label.setStyleSheet(
+                "QLabel {"
+                " background: rgba(0, 0, 0, 205);"
+                " color: white;"
+                " border: 1px solid rgba(255, 255, 255, 110);"
+                " border-radius: 10px;"
+                " padding: 28px;"
+                " font-size: 20px;"
+                " font-weight: bold;"
+                "}"
+            )
             self.image_label.setText("画像ファイルが見つかりません")
         else:
+            self.image_label.setStyleSheet(
+                "QLabel { background: transparent; border: none; padding: 0; }"
+            )
             self.image_label.clear()
             self._update_scaled_pixmap()
 
