@@ -36,8 +36,8 @@ from .poe_ninja import PoeNinjaPrice, default_poe_ninja_service
 
 
 class _TradeSignals(QObject):
-    completed = Signal(object, object)
-    failed = Signal(str)
+    completed = Signal(object, object, int)
+    failed = Signal(str, int)
     unique_candidates_ready = Signal(object)
     unique_variants_ready = Signal(object)
     leagues_ready = Signal(object)
@@ -565,6 +565,11 @@ class PoetoreWindow(QWidget):
         self._save_app_config = save_config
         self._league_refresh_started = False
         self._auto_league: str | None = None
+        self._has_searched_current_item = False
+        self._search_dirty = False
+        self._search_generation = 0
+        self._active_item_key: str | None = None
+        self._auto_search_queued = False
         self.setWindowFlags(Qt.Tool | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
         # PoENavi本体には入力透過（クリックスルー）機能があるため、
         # ぽえとれ側では常にマウス入力を受け取れる状態を明示する。
@@ -1023,9 +1028,77 @@ class PoetoreWindow(QWidget):
         self._last_trade_url = ""
         self._last_poe_ninja_url = ""
         self._poe_ninja_item_key = None
+        self._connect_search_trigger_signals()
         self.installEventFilter(self)
         for child in self.findChildren(QWidget):
             child.installEventFilter(self)
+
+    def _connect_search_trigger_signals(self):
+        """Awakened準拠の検索待ち・即時再検索トリガーを接続する。"""
+        for control in (
+            self.trade_preset_combo, self.base_scope_toggle, self.magic_rarity_toggle,
+            self.corrupted_combo, self.unidentified_chip, self.veiled_chip,
+            self.foil_chip, self.split_combo, self.mirrored_combo,
+            self.logbook_area_selector,
+        ):
+            control.currentIndexChanged.connect(self._mark_search_dirty)
+        for button in (
+            self.item_level_toggle, self.gem_level_toggle, self.gem_quality_toggle,
+            self.links_toggle, *self.influence_chips.values(),
+        ):
+            button.clicked.connect(self._mark_search_dirty)
+        for editor in (
+            self.item_level_edit, self.item_level_max_edit, self.gem_level_edit,
+            self.gem_quality_edit, self.links_edit,
+        ):
+            editor.textEdited.connect(self._mark_search_dirty)
+        for chip in (
+            self.map_tier_chip, self.base_percentile_chip, self.area_level_chip,
+            self.heist_wings_chip, self.heist_job_chip, self.cluster_passives_chip,
+        ):
+            chip.toggle.clicked.connect(self._mark_search_dirty)
+            chip.minimum_edit.textEdited.connect(self._mark_search_dirty)
+            chip.maximum_edit.textEdited.connect(self._mark_search_dirty)
+        self.unique_name_combo.currentIndexChanged.connect(self._mark_search_dirty)
+        self.unique_variant_combo.currentIndexChanged.connect(self._mark_search_dirty)
+        for combo in (
+            self.trade_status_combo, self.trade_currency_combo, self.listed_within_combo,
+        ):
+            combo.currentIndexChanged.connect(self._auto_search_after_trade_option_change)
+        self.trade_league_combo.currentIndexChanged.connect(
+            self._auto_search_after_trade_option_change
+        )
+        self.trade_league_combo.lineEdit().editingFinished.connect(
+            self._auto_search_after_trade_option_change
+        )
+
+    def _mark_search_dirty(self, *_args):
+        if not self._has_searched_current_item or getattr(self, "_parsed_item", None) is None:
+            return
+        self._search_generation += 1
+        self._search_dirty = True
+        self.price_list.clear()
+        self._last_trade_url = ""
+        self.trade_url_button.setEnabled(False)
+        self.price_status.clear()
+        self.price_button.setEnabled(True)
+
+    def _auto_search_after_trade_option_change(self, *_args):
+        if not self._has_searched_current_item or getattr(self, "_parsed_item", None) is None:
+            return
+        self._search_generation += 1
+        self._search_dirty = False
+        self.price_list.clear()
+        self._last_trade_url = ""
+        self.trade_url_button.setEnabled(False)
+        if self._auto_search_queued:
+            return
+        self._auto_search_queued = True
+        QTimer.singleShot(0, self._run_queued_auto_search)
+
+    def _run_queued_auto_search(self):
+        self._auto_search_queued = False
+        self.search_current_item()
 
     def _apply_poetore_style(self):
         """Awakenedの情報密度を、ぽえなびの黒＋黄緑テーマで表現する。"""
@@ -1363,6 +1436,21 @@ class PoetoreWindow(QWidget):
                 event.accept()
                 self.close()
                 return True
+            if (
+                self._search_dirty
+                and isinstance(watched, QLineEdit)
+                and event.key() in (Qt.Key_Return, Qt.Key_Enter)
+            ):
+                event.accept()
+                self.search_current_item()
+                return True
+        if (
+            event.type() == QEvent.Enter
+            and watched is self.price_button
+            and self._search_dirty
+        ):
+            self.search_current_item()
+            return True
         return super().eventFilter(watched, event)
 
     def _close_when_focus_leaves_panel(self, old, new):
@@ -1628,6 +1716,11 @@ class PoetoreWindow(QWidget):
         except ItemParseError as exc:
             QMessageBox.warning(self, "解析できませんでした", str(exc))
             return
+        if item.raw_text != self._active_item_key:
+            self._active_item_key = item.raw_text
+            self._has_searched_current_item = False
+            self._search_dirty = False
+            self._search_generation += 1
         if item.raw_text != self._unique_selector_item_key:
             self._reset_unique_candidates()
             self._unique_selector_item_key = item.raw_text
@@ -1715,6 +1808,10 @@ class PoetoreWindow(QWidget):
             return
         if _unsupported_initial_release_search_reason(item):
             return
+        self._has_searched_current_item = True
+        self._search_dirty = False
+        self._search_generation += 1
+        search_generation = self._search_generation
         self.price_button.setEnabled(False)
         self.trade_url_button.setEnabled(False)
         self.price_list.clear()
@@ -1825,9 +1922,9 @@ class PoetoreWindow(QWidget):
                     include_foil=include_foil,
                 )
             except (TradeApiError, ValueError) as exc:
-                self._trade_signals.failed.emit(str(exc))
+                self._trade_signals.failed.emit(str(exc), search_generation)
             else:
-                self._trade_signals.completed.emit(result, initial_filters)
+                self._trade_signals.completed.emit(result, initial_filters, search_generation)
 
         threading.Thread(target=run, daemon=True).start()
 
@@ -2551,6 +2648,7 @@ class PoetoreWindow(QWidget):
             checkbox.setToolTip("この条件を価格検索に使用する")
             Styles.apply_checkbox_style(checkbox)
             checkbox.setChecked(stat_filter.enabled)
+            checkbox.stateChanged.connect(self._mark_search_dirty)
             checkbox_container = QWidget()
             checkbox_layout = QHBoxLayout(checkbox_container)
             checkbox_layout.setContentsMargins(5, 0, 5, 0)
@@ -2584,15 +2682,19 @@ class PoetoreWindow(QWidget):
             editor.setPlaceholderText("最小")
             editor.setFixedWidth(80)
             editor.setEnabled(stat_filter.option_value is None)
+            editor.textEdited.connect(self._mark_search_dirty)
             self.mod_filter_tree.setItemWidget(row, _MOD_COLUMN_MIN, editor)
             max_editor = QLineEdit(maximum)
             max_editor.installEventFilter(self)
             max_editor.setPlaceholderText("最大")
             max_editor.setFixedWidth(80)
             max_editor.setEnabled(stat_filter.option_value is None)
+            max_editor.textEdited.connect(self._mark_search_dirty)
             self.mod_filter_tree.setItemWidget(row, _MOD_COLUMN_MAX, max_editor)
 
-    def _search_completed(self, result: PriceResult, initial_filters):
+    def _search_completed(self, result: PriceResult, initial_filters, search_generation: int):
+        if search_generation != self._search_generation:
+            return
         if initial_filters:
             self._populate_stat_filters(initial_filters)
         self._show_price_result(result)
@@ -2688,7 +2790,9 @@ class PoetoreWindow(QWidget):
             return f"{months}か月前"
         return f"{days // 365}年前"
 
-    def _show_price_error(self, message: str):
+    def _show_price_error(self, message: str, search_generation: int):
+        if search_generation != self._search_generation:
+            return
         self.price_button.setEnabled(True)
         self.price_list.clear()
         self.price_status.setText(message)

@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 import csv
 from pathlib import Path
 
-from PySide6.QtCore import QPoint, QRect, QSize, Qt
+from PySide6.QtCore import QEvent, QPoint, QRect, QSize, Qt
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication, QCheckBox, QComboBox, QLabel, QPushButton
 import pytest
@@ -217,6 +217,99 @@ def test_poetore_title_bar_keeps_close_button(qapp):
         window.show()
         close_buttons[0].click()
         assert not window.isVisible()
+    finally:
+        window.close()
+
+
+def test_search_condition_change_clears_stale_results_and_waits(qapp):
+    window = PoetoreWindow()
+    try:
+        window._parsed_item = ParsedItem(
+            "Rings", "Rare", "Test Ring", "Ruby Ring", "accessory", raw_text="test-ring",
+        )
+        window._has_searched_current_item = True
+        window._show_price_result(PriceResult(
+            "Mirage", "q", 1, (PriceListing(5, "chaos"),),
+            web_url="https://example.invalid/trade",
+        ))
+        window._populate_stat_filters((
+            TradeStatFilter("explicit.stat_1", "+# to maximum Life", 70, "explicit"),
+        ))
+        checkbox = window.mod_filter_tree.itemWidget(
+            window.mod_filter_tree.topLevelItem(0), 0,
+        ).findChild(QCheckBox, "modFilterCheckbox")
+
+        checkbox.click()
+
+        assert window._search_dirty is True
+        assert window.price_list.topLevelItemCount() == 0
+        assert window.price_status.text() == ""
+        assert not window.trade_url_button.isEnabled()
+        assert window.price_button.isEnabled()
+    finally:
+        window.close()
+
+
+def test_enter_in_changed_mod_value_researches(qapp):
+    window = PoetoreWindow()
+    try:
+        window.show()
+        window._parsed_item = ParsedItem(
+            "Rings", "Rare", "Test Ring", "Ruby Ring", "accessory", raw_text="test-ring",
+        )
+        window._has_searched_current_item = True
+        window._populate_stat_filters((
+            TradeStatFilter("explicit.stat_1", "+# to maximum Life", 70, "explicit"),
+        ))
+        editor = window.mod_filter_tree.itemWidget(
+            window.mod_filter_tree.topLevelItem(0), 4,
+        )
+        editor.setFocus()
+        QTest.keyClicks(editor, "8")
+        assert window._search_dirty is True
+
+        with patch.object(window, "search_current_item") as search:
+            QTest.keyClick(editor, Qt.Key_Return)
+
+        search.assert_called_once_with()
+    finally:
+        window.close()
+
+
+def test_hovering_search_button_researches_when_conditions_changed(qapp):
+    window = PoetoreWindow()
+    try:
+        window._parsed_item = ParsedItem(
+            "Rings", "Rare", "Test Ring", "Ruby Ring", "accessory", raw_text="test-ring",
+        )
+        window._has_searched_current_item = True
+        window._search_dirty = True
+
+        with patch.object(window, "search_current_item") as search:
+            QApplication.sendEvent(window.price_button, QEvent(QEvent.Enter))
+
+        search.assert_called_once_with()
+    finally:
+        window.close()
+
+
+@pytest.mark.parametrize("combo_name", [
+    "trade_status_combo", "trade_currency_combo", "listed_within_combo",
+])
+def test_trade_option_change_researches_immediately(qapp, combo_name):
+    window = PoetoreWindow()
+    try:
+        window._parsed_item = ParsedItem(
+            "Rings", "Rare", "Test Ring", "Ruby Ring", "accessory", raw_text="test-ring",
+        )
+        window._has_searched_current_item = True
+        combo = getattr(window, combo_name)
+
+        with patch.object(window, "search_current_item") as search:
+            combo.setCurrentIndex(1)
+            qapp.processEvents()
+
+        search.assert_called_once_with()
     finally:
         window.close()
 
