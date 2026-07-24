@@ -14,7 +14,7 @@ class ConfigManager:
     DEFAULT_CONFIG_FILE = "default_config.json"
     APP_NAME = "PoENavi"
     ENV_USER_DATA_DIR = "POENAVI_USER_DATA_DIR"
-    CURRENT_SCHEMA_VERSION = 3
+    CURRENT_SCHEMA_VERSION = 4
     POE1_ROUTE_ACT3_DEFAULT = "library_detour"
     POE1_ROUTE_ACT8_DEFAULT = "standard"
     POE1_ROUTE_ACT3_OLD_DEFAULT = "library_detour"
@@ -395,6 +395,17 @@ class ConfigManager:
             mini_navi = migrated.get("mini_guide_overlay")
             if isinstance(mini_navi, dict):
                 mini_navi.setdefault("display_mode", "standard")
+
+        if schema_version < 4:
+            hotkeys = migrated.get("hotkeys")
+            if isinstance(hotkeys, dict):
+                # 旧既定キーを使っている場合だけ、新しい既定配置へ移す。
+                # ユーザーが変更済みの割り当ては保持する。
+                if str(hotkeys.get("undo_lap", "")).lower() == "f10":
+                    hotkeys["undo_lap"] = "none"
+                if str(hotkeys.get("search_string_test", "")).lower() == "f4":
+                    hotkeys["search_string_test"] = "none"
+                hotkeys.setdefault("exit", "F4")
 
         if "poe1_route_selected" not in migrated:
             migrated["poe1_route_selected"] = cls._infer_poe1_route_selected(config)

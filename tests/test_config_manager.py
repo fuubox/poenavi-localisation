@@ -15,7 +15,8 @@ def write_default_config(app_dir: Path, overrides=None):
             "start_stop": "F1",
             "reset": "F2",
             "lap": "F3",
-            "undo_lap": "F4",
+            "undo_lap": "none",
+            "exit": "F4",
             "logout": "F5",
             "click_through": "F6",
             "hideout": "F11",
@@ -53,11 +54,26 @@ class ConfigManagerTest(unittest.TestCase):
             },
         })
 
-        self.assertEqual(migrated["schemaVersion"], 3)
+        self.assertEqual(migrated["schemaVersion"], ConfigManager.CURRENT_SCHEMA_VERSION)
         self.assertEqual(migrated["mini_guide_overlay"]["display_mode"], "standard")
         self.assertEqual(migrated["mini_guide_overlay"]["position"], {"x": 30, "y": 40})
         self.assertEqual(migrated["mini_guide_overlay"]["width"], 795)
         self.assertEqual(migrated["mini_guide_overlay"]["height"], 126)
+
+    def test_schema_v4_moves_old_default_f4_to_exit_without_overwriting_custom_hotkeys(self):
+        migrated = ConfigManager._migrate_config({
+            "schemaVersion": 3,
+            "hotkeys": {
+                "undo_lap": "F10",
+                "search_string_test": "F4",
+                "hideout": "Ctrl+H",
+            },
+        })
+
+        self.assertEqual(migrated["hotkeys"]["undo_lap"], "none")
+        self.assertEqual(migrated["hotkeys"]["search_string_test"], "none")
+        self.assertEqual(migrated["hotkeys"]["exit"], "F4")
+        self.assertEqual(migrated["hotkeys"]["hideout"], "Ctrl+H")
 
     def test_schema_v2_migrates_only_old_mini_navi_defaults(self):
         migrated = ConfigManager._migrate_config({

@@ -1462,12 +1462,13 @@ class SettingsDialog(QDialog):
         
         self.current_config = current_config or {}
         self.hotkeys = self.current_config.get("hotkeys", {
-            "start_stop": "F1", 
-            "reset": "F2",
-            "lap": "F3",
-            "undo_lap": "F4",
+            "start_stop": "F7",
+            "reset": "F8",
+            "lap": "F9",
+            "undo_lap": "none",
             "click_through": "F6",
             "logout": "F5",
+            "exit": "F4",
             "hideout": "F11",
             "monastery": "F12",
             "search_string_test": "none",
@@ -1629,7 +1630,7 @@ class SettingsDialog(QDialog):
         
         h_layout4 = QHBoxLayout()
         h_layout4.addWidget(QLabel("ラップ取消:"))
-        self.undo_lap_btn = HotkeyButton(self.hotkeys.get("undo_lap", "F4"))
+        self.undo_lap_btn = HotkeyButton(self.hotkeys.get("undo_lap", "none"))
         h_layout4.addWidget(self.undo_lap_btn)
         group_layout.addLayout(h_layout4)
         
@@ -1644,6 +1645,12 @@ class SettingsDialog(QDialog):
         self.logout_btn = HotkeyButton(self.hotkeys.get("logout", "F5"))
         h_layout6.addWidget(self.logout_btn)
         group_layout.addLayout(h_layout6)
+
+        h_layout_exit = QHBoxLayout()
+        h_layout_exit.addWidget(QLabel("キャラクター選択へ戻る（/exit）:"))
+        self.exit_btn = HotkeyButton(self.hotkeys.get("exit", "F4"))
+        h_layout_exit.addWidget(self.exit_btn)
+        group_layout.addLayout(h_layout_exit)
 
         h_layout7 = QHBoxLayout()
         h_layout7.addWidget(QLabel("隠れ家へ移動（/hideout）:"))
@@ -2716,6 +2723,7 @@ class SettingsDialog(QDialog):
                 "undo_lap": self.undo_lap_btn.key_text,
                 "click_through": self.click_through_btn.key_text,
                 "logout": self.logout_btn.key_text,
+                "exit": self.exit_btn.key_text,
                 "hideout": self.hideout_btn.key_text,
                 "monastery": self.monastery_btn.key_text,
                 "search_string_test": self.search_string_test_btn.key_text,
