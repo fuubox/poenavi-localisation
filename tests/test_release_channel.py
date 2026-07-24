@@ -95,3 +95,17 @@ def test_build_script_generates_and_packages_channel_metadata():
     assert "git remote get-url origin" in script
     assert "build\\generated\\update_channel.json;data" in script
     assert "-ReleaseRepository $env:GITHUB_REPOSITORY" in workflow
+
+
+def test_release_workflow_requires_curated_versioned_notes():
+    root = Path(__file__).resolve().parents[1]
+    workflow = (root / ".github" / "workflows" / "release.yml").read_text(
+        encoding="utf-8"
+    )
+    notes = root / "docs" / "releases" / "v2.6.3.md"
+
+    assert notes.is_file()
+    assert '$notes = "docs/releases/$env:GITHUB_REF_NAME.md"' in workflow
+    assert "Test-Path -LiteralPath $notes -PathType Leaf" in workflow
+    assert '--notes-file "docs/releases/$env:GITHUB_REF_NAME.md"' in workflow
+    assert "--generate-notes" not in workflow
