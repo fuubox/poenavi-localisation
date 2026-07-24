@@ -1901,8 +1901,8 @@ def test_filter_chips_follow_awakened_order_in_shared_flow_layout(qapp):
     window = PoetoreWindow()
     try:
         assert tuple(name for name, _widget in window._filter_chips) == (
-            "links", "map_tier", "completion_reward", "area_level", "logbook_area",
-            "heist_wings", "heist_job", "heist_target", "cluster_enchant",
+            "links", "map_tier", "completion_reward", "area_level", "heist_wings",
+            "heist_job", "heist_target", "cluster_enchant",
             "cluster_passives", "cluster_sockets", "blighted", "item_level",
             "base_percentile", "gem_variant", "gem_level", "quality",
             "influence_shaper", "influence_elder", "influence_crusader",
@@ -2090,6 +2090,34 @@ def test_logbook_area_switch_uses_custom_checkboxes_without_native_indicators(qa
         assert [checkbox.isChecked() for checkbox in checkboxes] == [False, True]
         assert [row.checkState(0) for row in rows] == [Qt.Unchecked, Qt.Unchecked]
         assert [row.data(0, Qt.UserRole + 5) for row in rows] == [False, True]
+    finally:
+        window.close()
+
+
+def test_logbook_area_switch_has_dedicated_row_and_fits_long_labels(qapp):
+    window = PoetoreWindow()
+    try:
+        groups = (
+            (1, "断たれた円環のドルイド"),
+            (2, "太陽の騎士団"),
+        )
+        window._logbook_area_groups = groups
+        window.logbook_area_selector.setLabels(
+            tuple(f"エリア{index + 1}：{label}" for index, (_group, label)
+                  in enumerate(groups))
+        )
+        window.logbook_area_container.show()
+
+        panel_layout = window._panel.layout()
+        chip_index = panel_layout.indexOf(window.filter_chip_container)
+        area_index = panel_layout.indexOf(window.logbook_area_container)
+        assert area_index == chip_index + 2
+        assert panel_layout.itemAt(area_index - 1).layout() is not None
+        assert window.logbook_area_selector.parentWidget() is window.logbook_area_container
+        assert window.logbook_area_selector not in window.filter_chip_layout.ordered_widgets()
+        for button in window.logbook_area_selector._buttons:
+            required = button.fontMetrics().horizontalAdvance(button.text()) + 24
+            assert button.minimumWidth() >= required
     finally:
         window.close()
 

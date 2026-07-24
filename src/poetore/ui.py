@@ -529,7 +529,7 @@ class _CycleButton(QPushButton):
 
 
 class _AreaSegmentedControl(QWidget):
-    """Logbookの最大5エリアを横並びで選ぶ小型セグメント。"""
+    """Logbookの最大5エリアを横並びで選ぶ専用セグメント。"""
 
     currentIndexChanged = Signal(int)
 
@@ -549,6 +549,9 @@ class _AreaSegmentedControl(QWidget):
             button = QPushButton(str(label))
             button.setObjectName("binaryToggle")
             button.setCheckable(True)
+            button.setMinimumWidth(
+                button.fontMetrics().horizontalAdvance(str(label)) + 24
+            )
             button.clicked.connect(lambda checked=False, value=index: self.setCurrentIndex(value))
             self._layout.addWidget(button)
             self._buttons.append(button)
@@ -1061,6 +1064,14 @@ class PoetoreWindow(QWidget):
         self.cluster_socket_chip.hide()
         self.logbook_area_selector = _AreaSegmentedControl()
         self.logbook_area_selector.currentIndexChanged.connect(self._logbook_area_changed)
+        self.logbook_area_container = QWidget()
+        self.logbook_area_container.setObjectName("logbookAreaContainer")
+        logbook_area_layout = QHBoxLayout(self.logbook_area_container)
+        logbook_area_layout.setContentsMargins(0, 0, 0, 0)
+        logbook_area_layout.setSpacing(0)
+        logbook_area_layout.addWidget(self.logbook_area_selector, 0, Qt.AlignLeft)
+        logbook_area_layout.addStretch()
+        self.logbook_area_container.hide()
         self.split_combo = _CycleButton(
             (("スプリット", True, False), ("非スプリット", False, False)),
         )
@@ -1074,7 +1085,6 @@ class PoetoreWindow(QWidget):
             ("map_tier", self.map_tier_chip),
             ("completion_reward", self.completion_reward_chip),
             ("area_level", self.area_level_chip),
-            ("logbook_area", self.logbook_area_selector),
             ("heist_wings", self.heist_wings_chip),
             ("heist_job", self.heist_job_chip),
             ("heist_target", self.heist_target_chip),
@@ -1099,6 +1109,7 @@ class PoetoreWindow(QWidget):
             self.filter_chip_layout.addWidget(chip)
         panel_layout.addWidget(self.filter_chip_container)
         panel_layout.addLayout(top_options)
+        panel_layout.addWidget(self.logbook_area_container)
 
         self.weapon_property_label = QLabel("武器性能・検索Mod")
         self.weapon_property_label.setObjectName("sectionTitle")
@@ -2717,6 +2728,7 @@ class PoetoreWindow(QWidget):
         if item.category != "expedition_logbook":
             self._logbook_area_groups = ()
             self.logbook_area_selector.setLabels(())
+            self.logbook_area_container.hide()
             return
         groups = []
         for group in sorted({mod.group for mod in item.modifiers if mod.group is not None}):
@@ -2731,6 +2743,7 @@ class PoetoreWindow(QWidget):
             tuple(f"エリア{index + 1}：{label}" for index, (_group, label)
                   in enumerate(self._logbook_area_groups))
         )
+        self.logbook_area_container.setVisible(bool(self._logbook_area_groups))
 
     def _logbook_area_changed(self, index):
         groups = getattr(self, "_logbook_area_groups", ())
