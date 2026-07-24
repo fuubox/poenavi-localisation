@@ -4,6 +4,7 @@ import math
 import re
 import sys
 import threading
+import time
 from datetime import datetime, timezone
 from dataclasses import replace
 from pathlib import Path
@@ -16,7 +17,7 @@ from PySide6.QtGui import (
 from PySide6.QtWidgets import (
     QAbstractItemView, QLayout,
     QApplication, QCheckBox, QComboBox, QFrame, QHBoxLayout, QLabel, QLineEdit, QMessageBox, QPushButton,
-    QSizeGrip, QSizePolicy, QTreeWidget, QTreeWidgetItem, QVBoxLayout, QWidget, QPlainTextEdit,
+    QMenu, QSizeGrip, QSizePolicy, QTreeWidget, QTreeWidgetItem, QVBoxLayout, QWidget, QPlainTextEdit,
     QHeaderView,
 )
 
@@ -45,6 +46,8 @@ class _TradeSignals(QObject):
     leagues_ready = Signal(object)
     poe_ninja_ready = Signal(object, object)
     poe_ninja_failed = Signal(object)
+    divine_rate_ready = Signal(object, object)
+    divine_rate_failed = Signal(object)
     global_mouse_pressed = Signal(int, int)
 
 
@@ -683,6 +686,15 @@ class _PoetoreTitleBar(QWidget):
         title = QLabel("ぽえとれ")
         title.setStyleSheet("font-weight: bold;")
         layout.addWidget(title)
+        window.divine_rate_button = QPushButton("⇄ …")
+        window.divine_rate_button.setObjectName("divineRateButton")
+        window.divine_rate_button.setToolTip("Divine OrbのChaos換算早見表")
+        window.divine_rate_button.setEnabled(False)
+        window.divine_rate_button.hide()
+        window.divine_rate_menu = QMenu(window.divine_rate_button)
+        window.divine_rate_menu.setObjectName("divineRateMenu")
+        window.divine_rate_button.setMenu(window.divine_rate_menu)
+        layout.addWidget(window.divine_rate_button)
         layout.addStretch()
         layout.addWidget(window.trade_league_combo)
         window.league_popup_button = QPushButton("▼")
@@ -1189,6 +1201,8 @@ class PoetoreWindow(QWidget):
         self._trade_signals.leagues_ready.connect(self._show_trade_leagues)
         self._trade_signals.poe_ninja_ready.connect(self._show_poe_ninja_price)
         self._trade_signals.poe_ninja_failed.connect(self._hide_poe_ninja_price)
+        self._trade_signals.divine_rate_ready.connect(self._show_divine_rate)
+        self._trade_signals.divine_rate_failed.connect(self._hide_divine_rate)
         self._trade_signals.global_mouse_pressed.connect(self._handle_global_mouse_press)
         self._trade_base_type = None
         self._trade_item_name = None
@@ -1200,6 +1214,8 @@ class PoetoreWindow(QWidget):
         self._last_trade_url = ""
         self._last_poe_ninja_url = ""
         self._poe_ninja_item_key = None
+        self._divine_rate_key = None
+        self._divine_rate_retry_after = 0.0
         self._connect_search_trigger_signals()
         self.installEventFilter(self)
         for child in self.findChildren(QWidget):
@@ -1300,6 +1316,20 @@ class PoetoreWindow(QWidget):
             QLabel#poeNinjaPriceMultiplier { color: #f4ffed; font-size: 13px; }
             QLabel#poeNinjaTrendLabel { color: #91b87a; font-size: 10px; }
             QPushButton#poeNinjaOpenButton { padding: 3px 7px; }
+            QPushButton#divineRateButton {
+                color: #f4ffed;
+                padding: 2px 7px;
+                font-weight: 700;
+                border-color: rgba(176, 255, 123, 100);
+            }
+            QMenu#divineRateMenu {
+                background: #161616;
+                color: #f4ffed;
+                border: 1px solid rgba(176, 255, 123, 120);
+                padding: 4px;
+            }
+            QMenu#divineRateMenu::item { padding: 4px 18px 4px 10px; }
+            QMenu#divineRateMenu::item:selected { background: rgba(176, 255, 123, 45); }
             QPushButton#leaguePopupButton {
                 color: #d8ffbd;
                 padding: 0;
@@ -1742,6 +1772,7 @@ class PoetoreWindow(QWidget):
             return
         self._poe_ninja_item_key = key
         self._hide_poe_ninja_price(key)
+        self._queue_divine_rate(league)
         if not league:
             return
 
@@ -1761,6 +1792,64 @@ class PoetoreWindow(QWidget):
                     self._trade_signals.poe_ninja_ready.emit(key, result)
 
         threading.Thread(target=run, daemon=True).start()
+
+    def _queue_divine_rate(self, league):
+        key = str(league or "")
+        if (
+            key == self._divine_rate_key
+            and (self.divine_rate_button.isEnabled() or time.monotonic() < self._divine_rate_retry_after)
+        ):
+            return
+        self._divine_rate_key = key
+        self._divine_rate_retry_after = float("inf")
+        self.divine_rate_button.setText("⇄ …")
+        self.divine_rate_button.setEnabled(False)
+        self.divine_rate_button.setVisible(bool(league))
+        self.divine_rate_menu.clear()
+        if not league:
+            return
+
+        def run():
+            try:
+                rate = default_poe_ninja_service.divine_chaos_rate(league)
+            except Exception:
+                self._trade_signals.divine_rate_failed.emit(key)
+            else:
+                if rate is None:
+                    self._trade_signals.divine_rate_failed.emit(key)
+                else:
+                    self._trade_signals.divine_rate_ready.emit(key, rate)
+
+        threading.Thread(target=run, daemon=True).start()
+
+    @staticmethod
+    def _awakened_round(value: float) -> int:
+        return math.floor(value + 0.5)
+
+    def _show_divine_rate(self, key, rate):
+        if key != self._divine_rate_key:
+            return
+        rate = float(rate)
+        self.divine_rate_button.setText(f"⇄ {self._awakened_round(rate)}")
+        self.divine_rate_button.setEnabled(True)
+        self.divine_rate_button.show()
+        self.divine_rate_menu.clear()
+        divine_icon_path = _asset_icon_path(_PRICE_CURRENCY_ICONS["divine"])
+        divine_icon = QIcon(str(divine_icon_path)) if divine_icon_path else QIcon()
+        for step in range(1, 10):
+            divine = step / 10
+            chaos = self._awakened_round(rate * divine)
+            self.divine_rate_menu.addAction(
+                divine_icon, f"{divine:.1f} div  →  {chaos} c"
+            )
+
+    def _hide_divine_rate(self, key=None):
+        if key is not None and key != self._divine_rate_key:
+            return
+        self.divine_rate_button.hide()
+        self.divine_rate_button.setEnabled(False)
+        self.divine_rate_menu.clear()
+        self._divine_rate_retry_after = time.monotonic() + 4 * 60
 
     def _show_poe_ninja_price(self, key, price: PoeNinjaPrice):
         if key != self._poe_ninja_item_key:

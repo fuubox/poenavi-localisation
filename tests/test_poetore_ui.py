@@ -2028,6 +2028,41 @@ def test_poe_ninja_price_panel_uses_chaos_icon_for_small_price(qapp):
         window.close()
 
 
+def test_divine_rate_button_builds_awakened_style_conversion_menu(qapp):
+    window = PoetoreWindow()
+    try:
+        window._divine_rate_key = "Standard"
+        window._show_divine_rate("Standard", 174.4)
+
+        assert not window.divine_rate_button.isHidden()
+        assert window.divine_rate_button.text() == "⇄ 174"
+        labels = [action.text() for action in window.divine_rate_menu.actions()]
+        assert labels == [
+            "0.1 div  →  17 c",
+            "0.2 div  →  35 c",
+            "0.3 div  →  52 c",
+            "0.4 div  →  70 c",
+            "0.5 div  →  87 c",
+            "0.6 div  →  105 c",
+            "0.7 div  →  122 c",
+            "0.8 div  →  140 c",
+            "0.9 div  →  157 c",
+        ]
+        assert all(not action.icon().isNull() for action in window.divine_rate_menu.actions())
+    finally:
+        window.close()
+
+
+def test_stale_divine_rate_result_does_not_replace_current_league(qapp):
+    window = PoetoreWindow()
+    try:
+        window._divine_rate_key = "Current"
+        window._show_divine_rate("Old", 200)
+        assert window.divine_rate_button.text() != "⇄ 200"
+    finally:
+        window.close()
+
+
 @pytest.mark.parametrize(("item_level", "minimum", "maximum"), [
     (49, "1", "49"),
     (50, "50", "67"),
