@@ -319,6 +319,7 @@ def _modifier_header_details(
     else:
         affix = kind if kind in {"prefix", "suffix"} else None
     generation = next((value for labels, value in (
+        (("corrupted implicit", "コラプト暗黙"), "corrupted"),
         (("foulborn", "ファウルボーン"), "foulborn"),
         (("monster mod", "モンスターモッド"), "monster"),
         (("crusader", "クルセーダー"), "crusader"), (("warlord", "ウォーロード"), "warlord"),
