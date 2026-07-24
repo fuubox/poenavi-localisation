@@ -11,6 +11,7 @@ from src.update.release_channel import (
     releases_page_url,
     validate_release_repository,
 )
+from src.version import APP_VERSION
 
 
 def test_build_metadata_selects_fork_release_repository(tmp_path):
@@ -102,10 +103,12 @@ def test_release_workflow_requires_curated_versioned_notes():
     workflow = (root / ".github" / "workflows" / "release.yml").read_text(
         encoding="utf-8"
     )
-    notes = root / "docs" / "releases" / "v2.6.3.md"
+    assert APP_VERSION == "2.6.4"
+    notes = root / "docs" / "releases" / f"v{APP_VERSION}.md"
 
     assert notes.is_file()
     assert '$notes = "docs/releases/$env:GITHUB_REF_NAME.md"' in workflow
     assert "Test-Path -LiteralPath $notes -PathType Leaf" in workflow
     assert '--notes-file "docs/releases/$env:GITHUB_REF_NAME.md"' in workflow
     assert "--generate-notes" not in workflow
+    assert "--prerelease" not in workflow
