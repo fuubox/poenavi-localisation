@@ -1,21 +1,24 @@
 from __future__ import annotations
 
-import threading
+import math
 import re
 import sys
+import threading
+import time
 from datetime import datetime, timezone
 from dataclasses import replace
 from pathlib import Path
 
 from PySide6.QtCore import QEvent, QObject, QPoint, QPointF, QRect, QSize, Qt, QTimer, Signal, QUrl
 from PySide6.QtGui import (
-    QColor, QDesktopServices, QIcon, QIntValidator, QPainter, QPen, QPixmap, QPolygonF,
+    QColor, QDesktopServices, QIcon, QIntValidator, QLinearGradient, QPainter,
+    QPalette, QPen, QPixmap, QPolygonF,
 )
 from PySide6.QtWidgets import (
     QAbstractItemView, QLayout,
     QApplication, QCheckBox, QComboBox, QFrame, QHBoxLayout, QLabel, QLineEdit, QMessageBox, QPushButton,
-    QSizeGrip, QSizePolicy, QTreeWidget, QTreeWidgetItem, QVBoxLayout, QWidget, QPlainTextEdit,
-    QHeaderView,
+    QMenu, QSizeGrip, QSizePolicy, QTreeWidget, QTreeWidgetItem, QVBoxLayout, QWidget, QPlainTextEdit,
+    QHeaderView, QWidgetAction,
 )
 
 from src.ui.styles import Styles
@@ -37,13 +40,15 @@ from .poe_ninja import PoeNinjaPrice, default_poe_ninja_service
 
 
 class _TradeSignals(QObject):
-    completed = Signal(object, object)
-    failed = Signal(str)
+    completed = Signal(object, object, int)
+    failed = Signal(str, int)
     unique_candidates_ready = Signal(object)
     unique_variants_ready = Signal(object)
     leagues_ready = Signal(object)
     poe_ninja_ready = Signal(object, object)
     poe_ninja_failed = Signal(object)
+    divine_rate_ready = Signal(object, object)
+    divine_rate_failed = Signal(object)
     global_mouse_pressed = Signal(int, int)
 
 
@@ -64,14 +69,155 @@ _MOD_COLUMN_MIN = 4
 _MOD_COLUMN_MAX = 5
 _MOD_COLUMN_DETAILS = 6
 _MOD_CHECK_COLUMN_WIDTH = 40
-_MOD_TIER_COLUMN_WIDTH = 94
+_MOD_TIER_COLUMN_WIDTH = 75
 _MOD_TEXT_COLUMN_WIDTH = 346
+_MOD_VALUE_EDITOR_WIDTH = 72
+_UNIQUE_ROLL_ROW_HEIGHT = 62
 _SPECIAL_CHIP_FILTER_IDS = {
     "property.map_tier", "property.area_level", "property.heist_wings",
     "property.base_percentile",
     "property.map_blighted", "property.map_uberblighted",
     "property.map_completion_reward",
 }
+
+
+def _roll_decimal_places(value: float, decimal: bool) -> int:
+    """Match Awakened's stat-specific display precision."""
+    if not decimal or abs(value) >= 10:
+        return 0
+    return 2 if abs(value) < 2.3 else 1
+
+
+def _rounded_slider_value(value: float, decimal: bool, *, upper: bool) -> float:
+    places = _roll_decimal_places(value, decimal)
+    scale = 10 ** places
+    adjusted = value * scale
+    rounded = math.ceil(adjusted - 1e-9) if upper else math.floor(adjusted + 1e-9)
+    return rounded / scale
+
+
+class _UniqueRollSlider(QWidget):
+    """Qt counterpart of Awakened's StatRollSlider for comparable unique rolls."""
+
+    valueCommitted = Signal(object, object)
+
+    def __init__(
+        self, bounds: tuple[float, float], roll: float, better: int,
+        decimal: bool, parent: QWidget | None = None,
+    ):
+        super().__init__(parent)
+        self._low, self._high = bounds
+        self._roll = min(max(roll, self._low), self._high)
+        self._better = better
+        self._decimal = decimal
+        self._minimum: float | None = None
+        self._maximum: float | None = None
+        self._preview: float | None = None
+        self._dragging = False
+        self.setMinimumHeight(24)
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.setCursor(Qt.PointingHandCursor)
+        self.setToolTip(tr_ui("クリックまたはドラッグで検索値を調整"))
+
+    def searchValues(self) -> tuple[float | None, float | None]:
+        return self._minimum, self._maximum
+
+    def setSearchValues(self, minimum: float | None, maximum: float | None):
+        self._minimum = minimum
+        self._maximum = maximum
+        self.update()
+
+    def _value_at(self, x: float) -> float:
+        width = max(1.0, float(self.width()))
+        ratio = min(1.0, max(0.0, x / width))
+        raw = self._low + (self._high - self._low) * ratio
+        value = _rounded_slider_value(
+            raw, self._decimal, upper=self._better < 0,
+        )
+        return min(self._high, max(self._low, value))
+
+    def _position(self, value: float) -> float:
+        span = self._high - self._low
+        if span <= 0:
+            return 0.0
+        return min(
+            float(self.width()),
+            max(0.0, (value - self._low) / span * self.width()),
+        )
+
+    @staticmethod
+    def _format(value: float) -> str:
+        return f"{value:g}"
+
+    def mousePressEvent(self, event):
+        if event.button() != Qt.LeftButton:
+            return super().mousePressEvent(event)
+        self._dragging = True
+        self._preview = self._value_at(event.position().x())
+        self.update()
+        event.accept()
+
+    def mouseMoveEvent(self, event):
+        if not self._dragging:
+            return super().mouseMoveEvent(event)
+        self._preview = self._value_at(event.position().x())
+        self.update()
+        event.accept()
+
+    def mouseReleaseEvent(self, event):
+        if event.button() != Qt.LeftButton or not self._dragging:
+            return super().mouseReleaseEvent(event)
+        self._preview = self._value_at(event.position().x())
+        if self._better > 0:
+            self._minimum, self._maximum = self._preview, None
+        else:
+            self._minimum, self._maximum = None, self._preview
+        self._dragging = False
+        self._preview = None
+        self.update()
+        self.valueCommitted.emit(self._minimum, self._maximum)
+        event.accept()
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+        rect = self.rect().adjusted(0, 3, -1, -3)
+        painter.setPen(QPen(QColor("#505650"), 1))
+        painter.setBrush(QColor("#252925"))
+        painter.drawRoundedRect(rect, 3, 3)
+
+        active = self._preview
+        if active is None:
+            active = self._minimum if self._better > 0 else self._maximum
+        if active is not None:
+            x = int(self._position(active))
+            fill = QRect(
+                x if self._better > 0 else 0,
+                rect.top(),
+                max(1, rect.right() - x + 1) if self._better > 0 else max(1, x),
+                rect.height(),
+            )
+            painter.setPen(Qt.NoPen)
+            gradient = QLinearGradient(fill.left(), 0, fill.right(), 0)
+            if self._better > 0:
+                gradient.setColorAt(0.0, QColor("#7f8781"))
+                gradient.setColorAt(1.0, QColor("#eef1ed"))
+            else:
+                gradient.setColorAt(0.0, QColor("#eef1ed"))
+                gradient.setColorAt(1.0, QColor("#7f8781"))
+            painter.setBrush(gradient)
+            painter.drawRoundedRect(fill, 3, 3)
+
+        roll_x = int(self._position(self._roll))
+        painter.setPen(QPen(QColor("#111111"), 2))
+        painter.drawLine(roll_x, rect.top(), roll_x, rect.bottom())
+
+        painter.setPen(QColor("#c6cec1"))
+        painter.drawText(rect.adjusted(4, 0, -4, 0), Qt.AlignLeft | Qt.AlignVCenter, self._format(self._low))
+        painter.drawText(rect.adjusted(4, 0, -4, 0), Qt.AlignRight | Qt.AlignVCenter, self._format(self._high))
+        if self._dragging and self._preview is not None:
+            painter.setPen(QColor("#ffffff"))
+            painter.drawText(rect, Qt.AlignCenter, self._format(self._preview))
 
 
 def _is_valdo_map(item) -> bool:
@@ -297,6 +443,24 @@ def _influence_chip_icon(label: str, active: bool) -> QIcon:
     return QIcon(result)
 
 
+_PRICE_CURRENCY_ICONS = {
+    "chaos": "ChaosOrb.png",
+    "divine": "DivineOrb.png",
+}
+
+
+def _asset_icon_path(filename: str) -> Path | None:
+    """開発実行・配布EXEのどちらでも同梱アイコンを解決する。"""
+    source_root = Path(__file__).resolve().parents[2]
+    executable_root = Path(sys.executable).resolve().parent
+    roots = (executable_root, Path(getattr(sys, "_MEIPASS", source_root)), source_root)
+    for root in roots:
+        path = root / "assets" / "icons" / filename
+        if path.is_file():
+            return path
+    return None
+
+
 class _FlowLayout(QLayout):
     """表示中の検索チップを利用可能な横幅で自動折り返しするレイアウト。"""
 
@@ -500,7 +664,7 @@ class _CycleButton(QPushButton):
 
 
 class _AreaSegmentedControl(QWidget):
-    """Logbookの最大5エリアを横並びで選ぶ小型セグメント。"""
+    """Logbookの最大5エリアを横並びで選ぶ専用セグメント。"""
 
     currentIndexChanged = Signal(int)
 
@@ -520,6 +684,9 @@ class _AreaSegmentedControl(QWidget):
             button = QPushButton(str(label))
             button.setObjectName("binaryToggle")
             button.setCheckable(True)
+            button.setMinimumWidth(
+                button.fontMetrics().horizontalAdvance(str(label)) + 24
+            )
             button.clicked.connect(lambda checked=False, value=index: self.setCurrentIndex(value))
             self._layout.addWidget(button)
             self._buttons.append(button)
@@ -657,6 +824,17 @@ class _PoetoreTitleBar(QWidget):
         title = QLabel(tr_ui("ぽえとれ"))
         title.setStyleSheet("font-weight: bold;")
         layout.addWidget(title)
+        window.divine_rate_button = QPushButton("⇄ …")
+        window.divine_rate_button.setObjectName("divineRateButton")
+        window.divine_rate_button.setToolTip(
+            tr_ui("Divine OrbのChaos換算早見表")
+        )
+        window.divine_rate_button.setEnabled(False)
+        window.divine_rate_button.hide()
+        window.divine_rate_menu = QMenu(window.divine_rate_button)
+        window.divine_rate_menu.setObjectName("divineRateMenu")
+        window.divine_rate_button.setMenu(window.divine_rate_menu)
+        layout.addWidget(window.divine_rate_button)
         layout.addStretch()
         layout.addWidget(window.trade_league_combo)
         window.league_popup_button = QPushButton("▼")
@@ -700,6 +878,11 @@ class PoetoreWindow(QWidget):
         self._save_app_config = save_config
         self._league_refresh_started = False
         self._auto_league: str | None = None
+        self._has_searched_current_item = False
+        self._search_dirty = False
+        self._search_generation = 0
+        self._active_item_key: str | None = None
+        self._auto_search_queued = False
         self.setWindowFlags(Qt.Tool | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
         # PoENavi本体には入力透過（クリックスルー）機能があるため、
         # ぽえとれ側では常にマウス入力を受け取れる状態を明示する。
@@ -793,6 +976,12 @@ class PoetoreWindow(QWidget):
         self.poe_ninja_price_label.setObjectName("poeNinjaPriceLabel")
         self.poe_ninja_price_value = QLabel("—")
         self.poe_ninja_price_value.setObjectName("poeNinjaPriceValue")
+        self.poe_ninja_price_multiplier = QLabel("×")
+        self.poe_ninja_price_multiplier.setObjectName("poeNinjaPriceMultiplier")
+        self.poe_ninja_currency_icon = QLabel()
+        self.poe_ninja_currency_icon.setObjectName("poeNinjaCurrencyIcon")
+        self.poe_ninja_currency_icon.setFixedSize(28, 28)
+        self.poe_ninja_currency_icon.setAlignment(Qt.AlignCenter)
         self.poe_ninja_trend_label = QLabel("")
         self.poe_ninja_trend_label.setObjectName("poeNinjaTrendLabel")
         self.poe_ninja_trend_chart = _SparklineWidget()
@@ -803,6 +992,8 @@ class PoetoreWindow(QWidget):
         self.poe_ninja_open_button.clicked.connect(self._open_poe_ninja_url)
         ninja_layout.addWidget(self.poe_ninja_price_label)
         ninja_layout.addWidget(self.poe_ninja_price_value)
+        ninja_layout.addWidget(self.poe_ninja_price_multiplier)
+        ninja_layout.addWidget(self.poe_ninja_currency_icon)
         ninja_layout.addStretch()
         ninja_layout.addWidget(self.poe_ninja_trend_label)
         ninja_layout.addWidget(self.poe_ninja_trend_chart)
@@ -838,8 +1029,10 @@ class PoetoreWindow(QWidget):
         self.trade_currency_combo = QComboBox()
         self.trade_currency_combo.addItem(tr_ui("すべての通貨"), "any")
         self.trade_currency_combo.addItem(tr_ui("カオスオーブのみ"), "chaos")
-        self.trade_currency_combo.addItem(tr_ui("ディヴァインオーブのみ"), "divine")
-        self.trade_currency_combo.addItem(tr_ui("カオス＋ディヴァイン"), "chaos_divine")
+        self.trade_currency_combo.addItem(tr_ui("神のオーブのみ"), "divine")
+        self.trade_currency_combo.addItem(
+            tr_ui("カオスまたは神のオーブ"), "chaos_divine"
+        )
         self.listed_within_combo = QComboBox()
         for label, value in (
             (tr_ui("期間指定なし"), "any"),
@@ -1027,6 +1220,14 @@ class PoetoreWindow(QWidget):
         self.cluster_socket_chip.hide()
         self.logbook_area_selector = _AreaSegmentedControl()
         self.logbook_area_selector.currentIndexChanged.connect(self._logbook_area_changed)
+        self.logbook_area_container = QWidget()
+        self.logbook_area_container.setObjectName("logbookAreaContainer")
+        logbook_area_layout = QHBoxLayout(self.logbook_area_container)
+        logbook_area_layout.setContentsMargins(0, 0, 0, 0)
+        logbook_area_layout.setSpacing(0)
+        logbook_area_layout.addWidget(self.logbook_area_selector, 0, Qt.AlignLeft)
+        logbook_area_layout.addStretch()
+        self.logbook_area_container.hide()
         self.split_combo = _CycleButton(
             ((tr_ui("スプリット"), True, False), (tr_ui("非スプリット"), False, False)),
         )
@@ -1040,7 +1241,6 @@ class PoetoreWindow(QWidget):
             ("map_tier", self.map_tier_chip),
             ("completion_reward", self.completion_reward_chip),
             ("area_level", self.area_level_chip),
-            ("logbook_area", self.logbook_area_selector),
             ("heist_wings", self.heist_wings_chip),
             ("heist_job", self.heist_job_chip),
             ("heist_target", self.heist_target_chip),
@@ -1065,6 +1265,7 @@ class PoetoreWindow(QWidget):
             self.filter_chip_layout.addWidget(chip)
         panel_layout.addWidget(self.filter_chip_container)
         panel_layout.addLayout(top_options)
+        panel_layout.addWidget(self.logbook_area_container)
 
         self.weapon_property_label = QLabel(tr_ui("武器性能・検索Mod"))
         self.weapon_property_label.setObjectName("sectionTitle")
@@ -1098,6 +1299,7 @@ class PoetoreWindow(QWidget):
         self.mod_filter_tree.setAlternatingRowColors(True)
         self.mod_filter_tree.setMinimumHeight(230)
         mod_header = self.mod_filter_tree.header()
+        mod_header.hide()
         mod_header.setSectionResizeMode(_MOD_COLUMN_CHECK, QHeaderView.Fixed)
         self.mod_filter_tree.setColumnWidth(
             _MOD_COLUMN_CHECK, _MOD_CHECK_COLUMN_WIDTH
@@ -1173,6 +1375,8 @@ class PoetoreWindow(QWidget):
         self._trade_signals.leagues_ready.connect(self._show_trade_leagues)
         self._trade_signals.poe_ninja_ready.connect(self._show_poe_ninja_price)
         self._trade_signals.poe_ninja_failed.connect(self._hide_poe_ninja_price)
+        self._trade_signals.divine_rate_ready.connect(self._show_divine_rate)
+        self._trade_signals.divine_rate_failed.connect(self._hide_divine_rate)
         self._trade_signals.global_mouse_pressed.connect(self._handle_global_mouse_press)
         self._trade_base_type = None
         self._trade_item_name = None
@@ -1184,9 +1388,79 @@ class PoetoreWindow(QWidget):
         self._last_trade_url = ""
         self._last_poe_ninja_url = ""
         self._poe_ninja_item_key = None
+        self._divine_rate_key = None
+        self._divine_rate_retry_after = 0.0
+        self._connect_search_trigger_signals()
         self.installEventFilter(self)
         for child in self.findChildren(QWidget):
             child.installEventFilter(self)
+
+    def _connect_search_trigger_signals(self):
+        """Awakened準拠の検索待ち・即時再検索トリガーを接続する。"""
+        for control in (
+            self.trade_preset_combo, self.base_scope_toggle, self.magic_rarity_toggle,
+            self.corrupted_combo, self.unidentified_chip, self.veiled_chip,
+            self.foil_chip, self.split_combo, self.mirrored_combo,
+            self.logbook_area_selector,
+        ):
+            control.currentIndexChanged.connect(self._mark_search_dirty)
+        for button in (
+            self.item_level_toggle, self.gem_level_toggle, self.gem_quality_toggle,
+            self.links_toggle, *self.influence_chips.values(),
+        ):
+            button.clicked.connect(self._mark_search_dirty)
+        for editor in (
+            self.item_level_edit, self.item_level_max_edit, self.gem_level_edit,
+            self.gem_quality_edit, self.links_edit,
+        ):
+            editor.textEdited.connect(self._mark_search_dirty)
+        for chip in (
+            self.map_tier_chip, self.base_percentile_chip, self.area_level_chip,
+            self.heist_wings_chip, self.heist_job_chip, self.cluster_passives_chip,
+        ):
+            chip.toggle.clicked.connect(self._mark_search_dirty)
+            chip.minimum_edit.textEdited.connect(self._mark_search_dirty)
+            chip.maximum_edit.textEdited.connect(self._mark_search_dirty)
+        self.unique_name_combo.currentIndexChanged.connect(self._mark_search_dirty)
+        self.unique_variant_combo.currentIndexChanged.connect(self._mark_search_dirty)
+        for combo in (
+            self.trade_status_combo, self.trade_currency_combo, self.listed_within_combo,
+        ):
+            combo.currentIndexChanged.connect(self._auto_search_after_trade_option_change)
+        self.trade_league_combo.currentIndexChanged.connect(
+            self._auto_search_after_trade_option_change
+        )
+        self.trade_league_combo.lineEdit().editingFinished.connect(
+            self._auto_search_after_trade_option_change
+        )
+
+    def _mark_search_dirty(self, *_args):
+        if not self._has_searched_current_item or getattr(self, "_parsed_item", None) is None:
+            return
+        self._search_generation += 1
+        self._search_dirty = True
+        self.price_list.clear()
+        self._last_trade_url = ""
+        self.trade_url_button.setEnabled(False)
+        self.price_status.clear()
+        self.price_button.setEnabled(True)
+
+    def _auto_search_after_trade_option_change(self, *_args):
+        if not self._has_searched_current_item or getattr(self, "_parsed_item", None) is None:
+            return
+        self._search_generation += 1
+        self._search_dirty = False
+        self.price_list.clear()
+        self._last_trade_url = ""
+        self.trade_url_button.setEnabled(False)
+        if self._auto_search_queued:
+            return
+        self._auto_search_queued = True
+        QTimer.singleShot(0, self._run_queued_auto_search)
+
+    def _run_queued_auto_search(self):
+        self._auto_search_queued = False
+        self.search_current_item()
 
     def _apply_poetore_style(self):
         """Awakenedの情報密度を、ぽえなびの黒＋黄緑テーマで表現する。"""
@@ -1213,8 +1487,23 @@ class PoetoreWindow(QWidget):
             }
             QLabel#poeNinjaPriceLabel { color: #91b87a; font-weight: 700; }
             QLabel#poeNinjaPriceValue { color: #f4ffed; font-size: 14px; font-weight: 700; }
+            QLabel#poeNinjaPriceMultiplier { color: #f4ffed; font-size: 13px; }
             QLabel#poeNinjaTrendLabel { color: #91b87a; font-size: 10px; }
             QPushButton#poeNinjaOpenButton { padding: 3px 7px; }
+            QPushButton#divineRateButton {
+                color: #f4ffed;
+                padding: 2px 7px;
+                font-weight: 700;
+                border-color: rgba(176, 255, 123, 100);
+            }
+            QMenu#divineRateMenu {
+                background: #161616;
+                color: #f4ffed;
+                border: 1px solid rgba(176, 255, 123, 120);
+                padding: 4px;
+            }
+            QMenu#divineRateMenu::item { padding: 4px 18px 4px 10px; }
+            QMenu#divineRateMenu::item:selected { background: rgba(176, 255, 123, 45); }
             QPushButton#leaguePopupButton {
                 color: #d8ffbd;
                 padding: 0;
@@ -1550,6 +1839,21 @@ class PoetoreWindow(QWidget):
                 event.accept()
                 self.close()
                 return True
+            if (
+                self._search_dirty
+                and isinstance(watched, QLineEdit)
+                and event.key() in (Qt.Key_Return, Qt.Key_Enter)
+            ):
+                event.accept()
+                self.search_current_item()
+                return True
+        if (
+            event.type() == QEvent.Enter
+            and watched is self.price_button
+            and self._search_dirty
+        ):
+            self.search_current_item()
+            return True
         return super().eventFilter(watched, event)
 
     def _close_when_focus_leaves_panel(self, old, new):
@@ -1671,6 +1975,7 @@ class PoetoreWindow(QWidget):
             return
         self._poe_ninja_item_key = key
         self._hide_poe_ninja_price(key)
+        self._queue_divine_rate(league)
         if not league:
             return
 
@@ -1691,10 +1996,105 @@ class PoetoreWindow(QWidget):
 
         threading.Thread(target=run, daemon=True).start()
 
+    def _queue_divine_rate(self, league):
+        key = str(league or "")
+        if (
+            key == self._divine_rate_key
+            and (self.divine_rate_button.isEnabled() or time.monotonic() < self._divine_rate_retry_after)
+        ):
+            return
+        self._divine_rate_key = key
+        self._divine_rate_retry_after = float("inf")
+        self.divine_rate_button.setText("⇄ …")
+        self.divine_rate_button.setEnabled(False)
+        self.divine_rate_button.setVisible(bool(league))
+        self.divine_rate_menu.clear()
+        if not league:
+            return
+
+        def run():
+            try:
+                rate = default_poe_ninja_service.divine_chaos_rate(league)
+            except Exception:
+                self._trade_signals.divine_rate_failed.emit(key)
+            else:
+                if rate is None:
+                    self._trade_signals.divine_rate_failed.emit(key)
+                else:
+                    self._trade_signals.divine_rate_ready.emit(key, rate)
+
+        threading.Thread(target=run, daemon=True).start()
+
+    @staticmethod
+    def _awakened_round(value: float) -> int:
+        return math.floor(value + 0.5)
+
+    def _show_divine_rate(self, key, rate):
+        if key != self._divine_rate_key:
+            return
+        rate = float(rate)
+        self.divine_rate_button.setText(f"⇄ {self._awakened_round(rate)}")
+        self.divine_rate_button.setEnabled(True)
+        self.divine_rate_button.show()
+        self.divine_rate_menu.clear()
+        divine_icon_path = _asset_icon_path(_PRICE_CURRENCY_ICONS["divine"])
+        chaos_icon_path = _asset_icon_path(_PRICE_CURRENCY_ICONS["chaos"])
+        for step in range(1, 10):
+            divine = step / 10
+            chaos = self._awakened_round(rate * divine)
+            action = QWidgetAction(self.divine_rate_menu)
+            action.setText(f"{divine:.1f} div  →  {chaos} c")
+            row = QWidget(self.divine_rate_menu)
+            layout = QHBoxLayout(row)
+            layout.setContentsMargins(10, 3, 14, 3)
+            layout.setSpacing(5)
+            for icon_path, text in (
+                (divine_icon_path, f"{divine:.1f}"),
+                (None, "→"),
+                (chaos_icon_path, str(chaos)),
+            ):
+                if icon_path is not None:
+                    icon = QLabel()
+                    pixmap = QPixmap(str(icon_path))
+                    icon.setPixmap(pixmap.scaled(
+                        18, 18, Qt.KeepAspectRatio, Qt.SmoothTransformation,
+                    ))
+                    layout.addWidget(icon)
+                label = QLabel(text)
+                label.setStyleSheet("color: #f4ffed; background: transparent;")
+                layout.addWidget(label)
+            action.setDefaultWidget(row)
+            self.divine_rate_menu.addAction(action)
+
+    def _hide_divine_rate(self, key=None):
+        if key is not None and key != self._divine_rate_key:
+            return
+        self.divine_rate_button.hide()
+        self.divine_rate_button.setEnabled(False)
+        self.divine_rate_menu.clear()
+        self._divine_rate_retry_after = time.monotonic() + 4 * 60
+
     def _show_poe_ninja_price(self, key, price: PoeNinjaPrice):
         if key != self._poe_ninja_item_key:
             return
-        self.poe_ninja_price_value.setText(price.display_price())
+        amount, currency = price.display_price_parts()
+        self.poe_ninja_price_value.setText(amount)
+        icon_path = _asset_icon_path(_PRICE_CURRENCY_ICONS[currency])
+        pixmap = QPixmap(str(icon_path)) if icon_path else QPixmap()
+        self.poe_ninja_currency_icon.setPixmap(
+            pixmap.scaled(26, 26, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            if not pixmap.isNull() else QPixmap()
+        )
+        currency_name = (
+            tr_ui("神のオーブ")
+            if currency == "divine"
+            else tr_ui("カオスオーブ")
+        )
+        self.poe_ninja_currency_icon.setToolTip(currency_name)
+        self.poe_ninja_price_multiplier.setVisible(not pixmap.isNull())
+        self.poe_ninja_currency_icon.setVisible(not pixmap.isNull())
+        if pixmap.isNull():
+            self.poe_ninja_price_value.setText(price.display_price())
         trend = price.trend_summary()
         self.poe_ninja_trend_label.setText(
             tr_ui(f"{trend[0]} {trend[1]}\n7日推移")
@@ -1710,6 +2110,9 @@ class PoetoreWindow(QWidget):
             return
         self.poe_ninja_price_panel.hide()
         self.poe_ninja_price_value.setText("—")
+        self.poe_ninja_price_multiplier.show()
+        self.poe_ninja_currency_icon.clear()
+        self.poe_ninja_currency_icon.setToolTip("")
         self.poe_ninja_trend_label.clear()
         self.poe_ninja_trend_chart.setPoints(())
         self._last_poe_ninja_url = ""
@@ -1830,6 +2233,11 @@ class PoetoreWindow(QWidget):
                 _localized_parse_error(exc),
             )
             return
+        if item.raw_text != self._active_item_key:
+            self._active_item_key = item.raw_text
+            self._has_searched_current_item = False
+            self._search_dirty = False
+            self._search_generation += 1
         if item.raw_text != self._unique_selector_item_key:
             self._reset_unique_candidates()
             self._unique_selector_item_key = item.raw_text
@@ -1935,6 +2343,10 @@ class PoetoreWindow(QWidget):
             return
         if _unsupported_initial_release_search_reason(item):
             return
+        self._has_searched_current_item = True
+        self._search_dirty = False
+        self._search_generation += 1
+        search_generation = self._search_generation
         self.price_button.setEnabled(False)
         self.trade_url_button.setEnabled(False)
         self.price_list.clear()
@@ -2047,9 +2459,9 @@ class PoetoreWindow(QWidget):
                     include_foil=include_foil,
                 )
             except (TradeApiError, ValueError) as exc:
-                self._trade_signals.failed.emit(str(exc))
+                self._trade_signals.failed.emit(str(exc), search_generation)
             else:
-                self._trade_signals.completed.emit(result, initial_filters)
+                self._trade_signals.completed.emit(result, initial_filters, search_generation)
 
         threading.Thread(target=run, daemon=True).start()
 
@@ -2567,6 +2979,7 @@ class PoetoreWindow(QWidget):
         if item.category != "expedition_logbook":
             self._logbook_area_groups = ()
             self.logbook_area_selector.setLabels(())
+            self.logbook_area_container.hide()
             return
         groups = []
         for group in sorted({mod.group for mod in item.modifiers if mod.group is not None}):
@@ -2586,6 +2999,7 @@ class PoetoreWindow(QWidget):
             tuple(tr_ui(f"エリア{index + 1}：{label}") for index, (_group, label)
                   in enumerate(self._logbook_area_groups))
         )
+        self.logbook_area_container.setVisible(bool(self._logbook_area_groups))
 
     def _logbook_area_changed(self, index):
         groups = getattr(self, "_logbook_area_groups", ())
@@ -2597,9 +3011,17 @@ class PoetoreWindow(QWidget):
             original = row.data(0, Qt.UserRole + 4)
             reason = original.selection_reason if isinstance(original, TradeStatFilter) else ""
             if reason.startswith("logbook-area:"):
-                row.setCheckState(
-                    0, Qt.Checked if reason == f"logbook-area:{selected_group}" else Qt.Unchecked,
+                checkbox_container = self.mod_filter_tree.itemWidget(
+                    row, _MOD_COLUMN_CHECK
                 )
+                checkbox = (
+                    checkbox_container.findChild(QCheckBox, "modFilterCheckbox")
+                    if checkbox_container is not None else None
+                )
+                enabled = reason == f"logbook-area:{selected_group}"
+                if checkbox is not None:
+                    checkbox.setChecked(enabled)
+                row.setData(_MOD_COLUMN_CHECK, Qt.UserRole + 5, enabled)
 
     def _trade_preset_changed(self):
         if not hasattr(self, "mod_filter_tree"):
@@ -2822,6 +3244,7 @@ class PoetoreWindow(QWidget):
             checkbox.setToolTip(tr_ui("この条件を価格検索に使用する"))
             Styles.apply_checkbox_style(checkbox)
             checkbox.setChecked(stat_filter.enabled)
+            checkbox.stateChanged.connect(self._mark_search_dirty)
             checkbox_container = QWidget()
             checkbox_layout = QHBoxLayout(checkbox_container)
             checkbox_layout.setContentsMargins(5, 0, 5, 0)
@@ -2853,17 +3276,101 @@ class PoetoreWindow(QWidget):
             editor = QLineEdit(value)
             editor.installEventFilter(self)
             editor.setPlaceholderText(tr_ui("最小"))
-            editor.setFixedWidth(80)
+            editor.setFixedWidth(_MOD_VALUE_EDITOR_WIDTH)
             editor.setEnabled(stat_filter.option_value is None)
+            editor.textEdited.connect(self._mark_search_dirty)
             self.mod_filter_tree.setItemWidget(row, _MOD_COLUMN_MIN, editor)
             max_editor = QLineEdit(maximum)
             max_editor.installEventFilter(self)
             max_editor.setPlaceholderText(tr_ui("最大"))
-            max_editor.setFixedWidth(80)
+            max_editor.setFixedWidth(_MOD_VALUE_EDITOR_WIDTH)
             max_editor.setEnabled(stat_filter.option_value is None)
+            max_editor.textEdited.connect(self._mark_search_dirty)
             self.mod_filter_tree.setItemWidget(row, _MOD_COLUMN_MAX, max_editor)
+            parsed_item = getattr(self, "_parsed_item", None)
+            show_unique_slider = (
+                parsed_item is not None
+                and parsed_item.rarity.casefold() in {"unique", "ユニーク"}
+                and stat_filter.roll_min is not None
+                and stat_filter.roll_max is not None
+                and stat_filter.roll_min < stat_filter.roll_max
+                and stat_filter.read_value is not None
+                and stat_filter.better in {-1, 1}
+                and stat_filter.option_value is None
+                and not stat_filter.exact
+            )
+            if show_unique_slider:
+                text_widget = QWidget()
+                text_widget.setObjectName("uniqueRollCell")
+                # QTreeWidget requires an opaque cell widget; otherwise the native
+                # item text is painted through it and appears as a duplicate.
+                text_widget.setAutoFillBackground(True)
+                text_palette = text_widget.palette()
+                text_palette.setColor(QPalette.Window, QColor("#121212"))
+                text_widget.setPalette(text_palette)
+                text_widget.setStyleSheet(
+                    "QWidget#uniqueRollCell { background-color: #121212; }"
+                    "QWidget#uniqueRollCell QLabel {"
+                    " background-color: #121212; color: #d8ded4;"
+                    "}"
+                )
+                text_layout = QVBoxLayout(text_widget)
+                text_layout.setContentsMargins(2, 3, 2, 3)
+                text_layout.setSpacing(3)
+                text_label = QLabel(stat_filter.text)
+                text_label.setToolTip(summary)
+                text_layout.addWidget(text_label)
+                slider = _UniqueRollSlider(
+                    (stat_filter.roll_min, stat_filter.roll_max),
+                    stat_filter.read_value,
+                    stat_filter.better,
+                    stat_filter.decimal,
+                )
+                slider.setObjectName("uniqueRollSlider")
+                slider.setSearchValues(stat_filter.min_value, stat_filter.max_value)
+                text_layout.addWidget(slider)
+                self.mod_filter_tree.setItemWidget(row, _MOD_COLUMN_TEXT, text_widget)
+                row.setSizeHint(
+                    _MOD_COLUMN_TEXT, QSize(0, _UNIQUE_ROLL_ROW_HEIGHT)
+                )
 
-    def _search_completed(self, result: PriceResult, initial_filters):
+                def sync_slider(
+                    _text="",
+                    *,
+                    roll_slider=slider,
+                    minimum_editor=editor,
+                    maximum_editor=max_editor,
+                ):
+                    def number(text: str) -> float | None:
+                        try:
+                            return float(text) if text.strip() else None
+                        except ValueError:
+                            return None
+                    roll_slider.setSearchValues(
+                        number(minimum_editor.text()),
+                        number(maximum_editor.text()),
+                    )
+
+                def commit_slider(
+                    minimum,
+                    maximum,
+                    *,
+                    minimum_editor=editor,
+                    maximum_editor=max_editor,
+                    condition_checkbox=checkbox,
+                ):
+                    minimum_editor.setText("" if minimum is None else f"{minimum:g}")
+                    maximum_editor.setText("" if maximum is None else f"{maximum:g}")
+                    condition_checkbox.setChecked(True)
+                    self._mark_search_dirty()
+
+                editor.textChanged.connect(sync_slider)
+                max_editor.textChanged.connect(sync_slider)
+                slider.valueCommitted.connect(commit_slider)
+
+    def _search_completed(self, result: PriceResult, initial_filters, search_generation: int):
+        if search_generation != self._search_generation:
+            return
         if initial_filters:
             self._populate_stat_filters(initial_filters)
         self._show_price_result(result)
@@ -2963,7 +3470,9 @@ class PoetoreWindow(QWidget):
             return tr_ui(f"{months}か月前")
         return tr_ui(f"{days // 365}年前")
 
-    def _show_price_error(self, message: str):
+    def _show_price_error(self, message: str, search_generation: int):
+        if search_generation != self._search_generation:
+            return
         self.price_button.setEnabled(True)
         self.price_list.clear()
         self.price_status.setText(_localized_trade_error(message))

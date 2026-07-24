@@ -7,6 +7,7 @@ from urllib.error import HTTPError
 from urllib.parse import parse_qs, urlsplit
 
 from src.poetore.parser import parse_item_text
+from src.poetore.metadata import unique_fixed_stats
 from src.poetore.models import ItemModifier, ParsedItem
 from src.poetore.trade import (
     PRESET_BASE, PRESET_FINISHED, PriceListing, PriceResult, TradeApiError, TradeStatFilter,
@@ -1767,6 +1768,44 @@ Onyx Amulet
     assert unresolved_modifier_warnings(item) == (
         "全てのブライト(ファイヤーボール-ディバインブラスト)ジェムのレベル +3",
     )
+
+
+def test_svalinn_fixed_lucky_block_is_not_an_unresolved_modifier():
+    item = parse_item_text("""アイテムクラス: 盾
+レアリティ: ユニーク
+Svalinn
+Girded Tower Shield
+--------
+品質: +12% (augmented)
+ブロック率: 23%
+アーマー: 458 (augmented)
+ワード: 138 (augmented)
+--------
+ソケット: R-R-R
+--------
+アイテムレベル: 86
+--------
+{ 暗黙モッド — ライフ }
+最大ライフ +20(10-20)
+--------
+{ ユニークモッド }
+スペルブロック率が15(10-15)%
+{ ユニークモッド — 防御 }
+ワード +123(100-150)
+{ ユニークモッド }
+アタックブロック率の最大値 -10%
+{ ユニークモッド }
+スペルブロック率の最大値 -10%
+{ ユニークモッド }
+ブロック確率が幸運になる
+(Lucky: 幸運は2度試行し、良いほうの結果を用いる)
+{ ユニークモッド — キャスター, ジェム }
+ブロック時にソケットされた元素スペルをトリガーする。クールダウンは0.25秒 — スケールできない値
+""")
+    filters = resolve_trade_stat_filters(item, trade_name="Svalinn")
+
+    assert unique_fixed_stats("Svalinn") is None
+    assert unresolved_modifier_warnings(item, filters) == ()
 
 
 def test_crafted_affix_header_is_counted_for_exact_empty_slots():

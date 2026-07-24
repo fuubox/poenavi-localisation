@@ -62,13 +62,23 @@ inventory and press `Alt+D`. Poetrieve captures the item's normal and detailed
 copy text, then opens a price-check window where you can review the parsed
 item, modifiers, league, listing age, currency, and other search filters.
 
+Poetrieve is an independent implementation for the Japanese Path of Exile
+client, informed by the public specifications, UI, and search logic of
+[Awakened PoE Trade](https://github.com/SnosMe/awakened-poe-trade). Data
+sources and licenses are detailed in
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
 Searches use the official Path of Exile Trade API, with poe.ninja prices shown
-as an additional reference where available. Poetrieve reads copied item text;
-it does not connect to the game client or read game memory. The window leaves
-Path of Exile focused after a capture, so you can move to another item and
-press `Alt+D` again. Click inside Poetrieve when you want to edit its filters.
-The hotkey can be changed or cleared under **Settings → Hotkeys → Poetrieve
-price check**.
+as an additional reference where available. Identified Unique items can show
+roll-range sliders for adjusting modifier searches, while the title bar can
+show the current poe.ninja Divine Orb-to-Chaos Orb rate and a compact
+conversion table. Currency icons identify applicable reference prices.
+
+Poetrieve reads copied item text; it does not connect to the game client or
+read game memory. The window leaves Path of Exile focused after a capture, so
+you can move to another item and press `Alt+D` again. Click inside Poetrieve
+when you want to edit its filters. The hotkey can be changed or cleared under
+**Settings → Hotkeys → Poetrieve price check**.
 
 > [!NOTE]
 > - Poetrieve is available only for PoE1.

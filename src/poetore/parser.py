@@ -598,6 +598,7 @@ def parse_item_text(text: str) -> ParsedItem:
                 option_value=option.value if option else None,
                 option_text=option.japanese if option else None,
                 oils=option.oils if option else (),
+                decimal=metadata.decimal if metadata else False,
             ))
 
     # 日本語クライアントの詳細コピーでは、Map Tierが独立したプロパティ行ではなく

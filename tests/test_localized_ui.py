@@ -20,6 +20,7 @@ from src.ui.main_window import (
     VendorSearchPresetDialog,
 )
 from src.ui.settings_dialog import SettingsDialog
+from src.poetore.poe_ninja import PoeNinjaPrice
 from src.poetore.ui import PoetoreWindow
 from src.utils.i18n import EN, JA, set_locale
 from src.utils.poe_version_data import POE1
@@ -182,9 +183,36 @@ def test_poetrieve_trade_validation_error_is_shown_in_english(qapp):
     set_locale(EN)
     window = PoetoreWindow()
     try:
-        window._show_price_error("アイテムレベルは1～100で指定してください。")
+        window._show_price_error(
+            "アイテムレベルは1～100で指定してください。",
+            window._search_generation,
+        )
 
         assert window.price_status.text() == "Item Level must be between 1 and 100."
+    finally:
+        window.close()
+        qapp.processEvents()
+
+
+def test_poetrieve_currency_icon_tooltip_follows_english_locale(qapp):
+    set_locale(EN)
+    window = PoetoreWindow()
+    try:
+        key = ("item", "Standard", "Mageblood", "Heavy Belt")
+        window._poe_ninja_item_key = key
+        window._show_poe_ninja_price(
+            key,
+            PoeNinjaPrice(
+                "Mageblood",
+                "Heavy Belt",
+                40000,
+                (),
+                "https://poe.ninja/example",
+                200,
+            ),
+        )
+
+        assert window.poe_ninja_currency_icon.toolTip() == "Divine Orb"
     finally:
         window.close()
         qapp.processEvents()
