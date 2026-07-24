@@ -28,14 +28,6 @@ ATTR_COLORS = {
     0: "#cccccc",  # 不明 = グレー
 }
 
-# type別のアイコン
-TYPE_LABELS = {
-    "quest": "報酬",
-    "vendor": "購入",
-    "lilly": "購入",
-}
-
-
 def format_quest_english_name(quest_key: str) -> str:
     """内部クエストキーを表示用の英語名に整形する。"""
     name = quest_key.rstrip("0123456789")
@@ -515,7 +507,11 @@ class GemTrackerWidget(QWidget):
                 gem_name_ja = gem.get("name_ja", "")
                 display_name = gem_name.title() if get_locale() == EN else (gem_name_ja or gem_name.title())
                 attr_color = ATTR_COLORS.get(gem.get("attribute", 0), ATTR_COLORS[0])
-                type_label = TYPE_LABELS.get(gem["type"], "")
+                type_label = (
+                    tr("gems.reward")
+                    if gem.get("type") == "quest"
+                    else tr("gems.vendor")
+                )
                 
                 # チェックボックス行
                 gem_row = QWidget()

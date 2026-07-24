@@ -4572,6 +4572,14 @@ class MainWindow(QMainWindow):
         guide_mode_layout.addWidget(self.part2_btn)
 
         self.visit_btn = QPushButton(tr_ui("自動"))
+        self.visit_btn.setToolTip(tr_ui(
+            "現在のエリアに表示するガイドだけを切り替えます。\n"
+            "自動: ぽえなびが記録した訪問回数に合わせて選択します。\n"
+            "1回目: 初回訪問用ガイドを表示します。\n"
+            "2回目: 再訪問用ガイドを表示します。\n"
+            "再訪問用ガイドがない場合は、初回訪問用ガイドを表示します。\n"
+            "手動選択は、街以外のエリアに入ると自動へ戻ります。"
+        ))
         self.visit_btn.setStyleSheet(self._visit_btn_style())
         self.visit_btn.setFixedHeight(22)
         self.visit_btn.clicked.connect(self.toggle_visit_override)

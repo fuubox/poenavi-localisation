@@ -13,7 +13,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from src.ui.gem_tracker_widget import PoBSkillSetSelectionDialog
+from src.ui.gem_tracker_widget import GemTrackerWidget, PoBSkillSetSelectionDialog
 from src.ui.cheat_sheets import CheatSheetManagerDialog, CheatSheetOverlay
 from src.ui.main_window import (
     GuideDetailLevelSelectionDialog,
@@ -95,9 +95,64 @@ def test_main_window_chrome_constructs_in_english(qapp):
         window = MainWindow(config=config)
         try:
             _assert_no_japanese(_display_texts(window))
+            tooltip = window.visit_btn.toolTip()
+            assert "only changes the guide displayed for the current area" in tooltip
+            assert "Automatic:" in tooltip
+            assert "First time:" in tooltip
+            assert "Second time:" in tooltip
+            assert "falls back to the first-visit guide" in tooltip
+            assert "after entering a non-town area" in tooltip
+            _assert_no_japanese([tooltip])
         finally:
             window.deleteLater()
             qapp.processEvents()
+
+
+def test_gem_acquisition_badges_construct_in_english(qapp):
+    set_locale(EN)
+    widget = GemTrackerWidget()
+    plan = [
+        {
+            "act": 1,
+            "quest": "enemy at the gate",
+            "quest_ja": "浜辺の敵",
+            "npc": "tarkleigh",
+            "gems": [
+                {
+                    "name": "arc",
+                    "name_ja": "アーク",
+                    "type": "quest",
+                    "attribute": 3,
+                },
+                {
+                    "name": "frostblink",
+                    "name_ja": "フロストブリンク",
+                    "type": "vendor",
+                    "attribute": 3,
+                },
+                {
+                    "name": "clarity",
+                    "name_ja": "クラリティ",
+                    "type": "lilly",
+                    "attribute": 3,
+                },
+            ],
+        }
+    ]
+    try:
+        widget.set_acquisition_plan(plan)
+        labels = [
+            label.text()
+            for label in widget.findChildren(QLabel)
+            if label.text()
+        ]
+        assert "Quest" in labels
+        assert labels.count("Buy") == 2
+        assert "報酬" not in labels
+        assert "購入" not in labels
+    finally:
+        widget.deleteLater()
+        qapp.processEvents()
 
 
 def test_startup_and_pob_selection_dialogs_construct_in_english(qapp):
