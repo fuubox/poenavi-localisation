@@ -11,7 +11,7 @@ from pathlib import Path
 from PySide6.QtCore import QEvent, QObject, QPoint, QPointF, QRect, QSize, Qt, QTimer, Signal, QUrl
 from PySide6.QtGui import (
     QColor, QDesktopServices, QIcon, QIntValidator, QLinearGradient, QPainter,
-    QPen, QPixmap, QPolygonF,
+    QPalette, QPen, QPixmap, QPolygonF,
 )
 from PySide6.QtWidgets import (
     QAbstractItemView, QLayout,
@@ -2895,6 +2895,9 @@ class PoetoreWindow(QWidget):
                 # QTreeWidget requires an opaque cell widget; otherwise the native
                 # item text is painted through it and appears as a duplicate.
                 text_widget.setAutoFillBackground(True)
+                text_palette = text_widget.palette()
+                text_palette.setColor(QPalette.Window, QColor("#121212"))
+                text_widget.setPalette(text_palette)
                 text_layout = QVBoxLayout(text_widget)
                 text_layout.setContentsMargins(2, 3, 2, 3)
                 text_layout.setSpacing(3)

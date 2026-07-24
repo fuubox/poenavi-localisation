@@ -5,6 +5,7 @@ import csv
 from pathlib import Path
 
 from PySide6.QtCore import QEvent, QPoint, QRect, QSize, Qt
+from PySide6.QtGui import QPalette
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication, QCheckBox, QComboBox, QLabel, QPushButton
 import pytest
@@ -754,6 +755,7 @@ def test_unique_variable_roll_slider_drag_updates_minimum_and_enables_filter(qap
         text_widget = window.mod_filter_tree.itemWidget(row, 3)
         assert row.text(3) == source.text
         assert text_widget.autoFillBackground()
+        assert text_widget.palette().color(QPalette.Window).name() == "#121212"
         assert len(text_widget.findChildren(QLabel)) == 1
         assert row.sizeHint(3).height() == 62
 
