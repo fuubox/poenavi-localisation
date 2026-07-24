@@ -35,7 +35,8 @@ class UpdateAvailableDialog(QDialog):
         layout.addWidget(title)
 
         notes = QTextBrowser()
-        notes.setPlainText(release.notes)
+        notes.setMarkdown(release.notes)
+        notes.setOpenExternalLinks(True)
         layout.addWidget(notes)
 
         buttons = QDialogButtonBox()
