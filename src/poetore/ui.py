@@ -2891,10 +2891,10 @@ class PoetoreWindow(QWidget):
                 and not stat_filter.exact
             )
             if show_unique_slider:
-                # A cell widget is drawn over the tree item's native text. Clear the
-                # native text so the QLabel below is the only visible copy.
-                row.setText(_MOD_COLUMN_TEXT, "")
                 text_widget = QWidget()
+                # QTreeWidget requires an opaque cell widget; otherwise the native
+                # item text is painted through it and appears as a duplicate.
+                text_widget.setAutoFillBackground(True)
                 text_layout = QVBoxLayout(text_widget)
                 text_layout.setContentsMargins(2, 3, 2, 3)
                 text_layout.setSpacing(3)

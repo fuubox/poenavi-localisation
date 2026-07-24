@@ -752,7 +752,8 @@ def test_unique_variable_roll_slider_drag_updates_minimum_and_enables_filter(qap
         )
         assert slider is not None
         text_widget = window.mod_filter_tree.itemWidget(row, 3)
-        assert row.text(3) == ""
+        assert row.text(3) == source.text
+        assert text_widget.autoFillBackground()
         assert len(text_widget.findChildren(QLabel)) == 1
         assert row.sizeHint(3).height() == 62
 
