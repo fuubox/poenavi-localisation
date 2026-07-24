@@ -15,12 +15,15 @@ def write_default_config(app_dir: Path, overrides=None):
             "start_stop": "F1",
             "reset": "F2",
             "lap": "F3",
-            "undo_lap": "F4",
+            "undo_lap": "none",
+            "exit": "F4",
             "logout": "F5",
             "click_through": "F6",
             "hideout": "F11",
             "monastery": "F12",
             "search_string_test": "none",
+            "poetore_capture": "alt+d",
+            "cheat_sheets_toggle": "shift+space",
         },
         "poe_version": "poe1",
         "poe_version_mode": "ask",
@@ -72,7 +75,7 @@ class ConfigManagerTest(unittest.TestCase):
             ), patch.object(ConfigManager, "get_app_dir", return_value=app_dir):
                 loaded = ConfigManager.load_config()
 
-            self.assertEqual(loaded["schemaVersion"], 4)
+            self.assertEqual(loaded["schemaVersion"], ConfigManager.CURRENT_SCHEMA_VERSION)
             self.assertEqual(loaded["language"], "en")
             self.assertTrue(loaded["language_selected"])
             self.assertEqual(loaded["hotkeys"]["poetore_capture"], "alt+d")
@@ -107,6 +110,65 @@ class ConfigManagerTest(unittest.TestCase):
             self.assertEqual(loaded["hotkeys"]["start_stop"], "Alt+D")
             self.assertEqual(loaded["hotkeys"]["poetore_capture"], "none")
 
+    def test_schema_v4_does_not_steal_custom_f4_or_shift_space_hotkeys(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            app_dir = Path(tmp) / "app"
+            user_dir = Path(tmp) / "user-data"
+            app_dir.mkdir()
+            user_dir.mkdir()
+            write_default_config(app_dir)
+            (user_dir / ConfigManager.CONFIG_FILE).write_text(
+                json.dumps({
+                    "schemaVersion": 4,
+                    "hotkeys": {
+                        "start_stop": "F4",
+                        "lap": "Shift+Space",
+                        "poetore_capture": "Alt+Q",
+                    },
+                }),
+                encoding="utf-8",
+            )
+
+            with patch.dict(
+                os.environ,
+                {ConfigManager.ENV_USER_DATA_DIR: str(user_dir)},
+            ), patch.object(ConfigManager, "get_app_dir", return_value=app_dir):
+                loaded = ConfigManager.load_config()
+
+            self.assertEqual(loaded["hotkeys"]["start_stop"], "F4")
+            self.assertEqual(loaded["hotkeys"]["lap"], "Shift+Space")
+            self.assertEqual(loaded["hotkeys"]["exit"], "none")
+            self.assertEqual(loaded["hotkeys"]["cheat_sheets_toggle"], "none")
+            self.assertEqual(loaded["hotkeys"]["poetore_capture"], "Alt+Q")
+
+    def test_schema_v4_moves_known_old_defaults_to_new_exit_binding(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            app_dir = Path(tmp) / "app"
+            user_dir = Path(tmp) / "user-data"
+            app_dir.mkdir()
+            user_dir.mkdir()
+            write_default_config(app_dir)
+            (user_dir / ConfigManager.CONFIG_FILE).write_text(
+                json.dumps({
+                    "schemaVersion": 4,
+                    "hotkeys": {
+                        "undo_lap": "F10",
+                        "search_string_test": "F4",
+                    },
+                }),
+                encoding="utf-8",
+            )
+
+            with patch.dict(
+                os.environ,
+                {ConfigManager.ENV_USER_DATA_DIR: str(user_dir)},
+            ), patch.object(ConfigManager, "get_app_dir", return_value=app_dir):
+                loaded = ConfigManager.load_config()
+
+            self.assertEqual(loaded["hotkeys"]["undo_lap"], "none")
+            self.assertEqual(loaded["hotkeys"]["search_string_test"], "none")
+            self.assertEqual(loaded["hotkeys"]["exit"], "F4")
+
     def test_schema_v4_adds_standard_mode_to_localized_schema_v3_config(self):
         migrated = ConfigManager._migrate_config({
             "schemaVersion": 3,
@@ -118,7 +180,7 @@ class ConfigManagerTest(unittest.TestCase):
             },
         })
 
-        self.assertEqual(migrated["schemaVersion"], 4)
+        self.assertEqual(migrated["schemaVersion"], ConfigManager.CURRENT_SCHEMA_VERSION)
         self.assertEqual(migrated["mini_guide_overlay"]["display_mode"], "standard")
         self.assertEqual(migrated["mini_guide_overlay"]["position"], {"x": 30, "y": 40})
         self.assertEqual(migrated["mini_guide_overlay"]["width"], 800)
@@ -139,6 +201,21 @@ class ConfigManagerTest(unittest.TestCase):
         self.assertEqual(migrated["mini_guide_overlay"]["position"], {"x": 30, "y": 40})
         self.assertEqual(migrated["mini_guide_overlay"]["width"], 795)
         self.assertEqual(migrated["mini_guide_overlay"]["height"], 126)
+
+    def test_schema_v5_moves_old_default_f4_to_exit_without_overwriting_custom_hotkeys(self):
+        migrated = ConfigManager._migrate_config({
+            "schemaVersion": 4,
+            "hotkeys": {
+                "undo_lap": "F10",
+                "search_string_test": "F4",
+                "hideout": "Ctrl+H",
+            },
+        })
+
+        self.assertEqual(migrated["hotkeys"]["undo_lap"], "none")
+        self.assertEqual(migrated["hotkeys"]["search_string_test"], "none")
+        self.assertEqual(migrated["hotkeys"]["exit"], "F4")
+        self.assertEqual(migrated["hotkeys"]["hideout"], "Ctrl+H")
 
     def test_schema_v3_migrates_only_old_mini_navi_defaults(self):
         migrated = ConfigManager._migrate_config({

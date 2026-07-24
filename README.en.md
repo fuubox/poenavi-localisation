@@ -45,15 +45,29 @@ window behavior, maps, routes, and language there.
 
 The default hotkeys are:
 
-- `F1`: start/stop timer
-- `F2`: reset timer
-- `F3`: next Act/lap
-- `F4`: undo lap
-- `F5`: log out
+- `F7`: start/stop timer
+- `F8`: reset timer
+- `F9`: next Act/lap
+- Undo lap: unassigned
+- `F4`: return to Character Selection with `/exit`
+- `F5`: fast logout by disconnecting PoE's TCP connection
 - `F6`: toggle click-through
 - `F11`: `/hideout`
 - `F12`: `/monastery`
 - `Alt+D`: Poetrieve price check (PoE1)
+- `Shift+Space`: show or hide Cheat sheets
+
+The F5 TCP logout requires administrator privileges. F4 sends `/exit` through
+chat and does not disconnect the game connection.
+
+### Cheat sheets
+
+Use the image button in the main window to add reference images, rename or
+remove them, choose the overlay opacity, and switch between them. PNG, JPEG,
+WebP, BMP, and GIF files are copied into PoENavi's user-data directory, so the
+overlay does not depend on the original file remaining in place. The overlay
+opens centered on the Path of Exile monitor and can be moved by dragging its
+image title.
 
 ### PoE1: Poetrieve price checking
 
@@ -104,7 +118,7 @@ tokens, and progression logic locale-neutral.
 ## Development
 
 ```powershell
-python -m pip install -r requirements.txt pytest
+python -m pip install -r requirements.txt pytest pytest-qt
 $env:QT_QPA_PLATFORM="offscreen"
 python -m pytest -q
 python scripts/validate_locales.py
@@ -166,8 +180,8 @@ the current experience penalty state.
 
 The RTA timer records elapsed time and supports manual lap controls, automatic
 Act transitions, Act 1-5 / Act 6-10 mode selection, and saved timer state. The
-default controls are F1-F6, F11, and F12 as listed above; every hotkey can be
-changed in Settings.
+default controls are listed above; every hotkey can be changed or cleared in
+Settings.
 
 For PoE 1, pressing `Ready` with a reset timer waits for the new character to
 enter **The Twilight Strand**, then starts the timer automatically when that

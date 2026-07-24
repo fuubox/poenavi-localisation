@@ -1478,16 +1478,18 @@ class SettingsDialog(QDialog):
         
         self.current_config = current_config or {}
         self.hotkeys = self.current_config.get("hotkeys", {
-            "start_stop": "F1", 
-            "reset": "F2",
-            "lap": "F3",
-            "undo_lap": "F4",
+            "start_stop": "F7",
+            "reset": "F8",
+            "lap": "F9",
+            "undo_lap": "none",
             "click_through": "F6",
             "logout": "F5",
+            "exit": "F4",
             "hideout": "F11",
             "monastery": "F12",
             "search_string_test": "none",
             "poetore_capture": "alt+d",
+            "cheat_sheets_toggle": "shift+space",
         })
         self.poe_version = self.current_config.get("poe_version", POE1)
         self.poe_version_mode = self.current_config.get("poe_version_mode", "ask")
@@ -1661,7 +1663,7 @@ class SettingsDialog(QDialog):
         
         h_layout4 = QHBoxLayout()
         h_layout4.addWidget(QLabel(tr_ui("ラップ取消:")))
-        self.undo_lap_btn = HotkeyButton(self.hotkeys.get("undo_lap", "F4"))
+        self.undo_lap_btn = HotkeyButton(self.hotkeys.get("undo_lap", "none"))
         h_layout4.addWidget(self.undo_lap_btn)
         group_layout.addLayout(h_layout4)
         
@@ -1672,10 +1674,16 @@ class SettingsDialog(QDialog):
         group_layout.addLayout(h_layout5)
         
         h_layout6 = QHBoxLayout()
-        h_layout6.addWidget(QLabel(tr_ui("ログアウト:")))
+        h_layout6.addWidget(QLabel(tr_ui("ログアウト（TCP切断）:")))
         self.logout_btn = HotkeyButton(self.hotkeys.get("logout", "F5"))
         h_layout6.addWidget(self.logout_btn)
         group_layout.addLayout(h_layout6)
+
+        h_layout_exit = QHBoxLayout()
+        h_layout_exit.addWidget(QLabel(tr_ui("キャラクター選択へ戻る（/exit）:")))
+        self.exit_btn = HotkeyButton(self.hotkeys.get("exit", "F4"))
+        h_layout_exit.addWidget(self.exit_btn)
+        group_layout.addLayout(h_layout_exit)
 
         h_layout7 = QHBoxLayout()
         h_layout7.addWidget(QLabel(tr_ui("隠れ家へ移動（/hideout）:")))
@@ -1702,6 +1710,14 @@ class SettingsDialog(QDialog):
         )
         h_layout10.addWidget(self.poetore_capture_btn)
         group_layout.addLayout(h_layout10)
+
+        h_layout11 = QHBoxLayout()
+        h_layout11.addWidget(QLabel(tr_ui("Cheat sheets表示:")))
+        self.cheat_sheets_toggle_btn = HotkeyButton(
+            self.hotkeys.get("cheat_sheets_toggle", "shift+space")
+        )
+        h_layout11.addWidget(self.cheat_sheets_toggle_btn)
+        group_layout.addLayout(h_layout11)
         
         self.logout_enabled_cb = QCheckBox(tr_ui("ログアウト機能を有効にする（TCP切断）"))
         self.logout_enabled_cb.setChecked(self.current_config.get("logout_enabled", True))
@@ -2751,10 +2767,12 @@ class SettingsDialog(QDialog):
                 "undo_lap": self.undo_lap_btn.key_text,
                 "click_through": self.click_through_btn.key_text,
                 "logout": self.logout_btn.key_text,
+                "exit": self.exit_btn.key_text,
                 "hideout": self.hideout_btn.key_text,
                 "monastery": self.monastery_btn.key_text,
                 "search_string_test": self.search_string_test_btn.key_text,
                 "poetore_capture": self.poetore_capture_btn.key_text,
+                "cheat_sheets_toggle": self.cheat_sheets_toggle_btn.key_text,
             },
             "logout_enabled": self.logout_enabled_cb.isChecked(),
             "client_log_paths": {

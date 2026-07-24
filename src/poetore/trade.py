@@ -1919,14 +1919,21 @@ def resolve_trade_stat_filters(
                 item.category == "accessory" and not talisman
                 and "corrupted" not in item.flags and "mirrored" not in item.flags
             )
-            if modifiable_amulet and not any(oil in {12, 13} for oil in modifier.oils):
-                # Awakened同様、付け直しやすい安価なAnointmentは候補自体を隠す。
+            if modifiable_amulet and not any(oil in {11, 12, 13} for oil in modifier.oils):
+                # Awakenedの銀・金に加え、相場が高くなりやすい乳白色を使う
+                # Anointmentも候補へ表示する。その他の付け直しやすいものは隠す。
                 continue
         roll_bounds = _unique_roll_bounds(modifier.text) if unique_item else None
         if unique_item and roll_bounds is None:
-            if fixed_unique_refs is None or modifier.ref in fixed_unique_refs:
+            corrupted_implicit = (
+                modifier.kind == "implicit" and modifier.generation == "corrupted"
+            )
+            if not corrupted_implicit and (
+                fixed_unique_refs is None or modifier.ref in fixed_unique_refs
+            ):
                 # Awakened準拠: 常設Modでも可変ロールがあれば候補へ残す。
-                # 数値なしModはfixedStats外のVariantだけを候補として扱う。
+                # 数値なしModはfixedStats外のVariantだけを候補として扱うが、
+                # 後付けされたコラプト暗黙はUnique固定Modではないため残す。
                 continue
         api_kind = "explicit" if modifier.kind in {"prefix", "suffix"} else modifier.kind
         source = _normalized_stat_text(modifier.text)

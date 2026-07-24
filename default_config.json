@@ -1,18 +1,20 @@
 {
-    "schemaVersion": 4,
+    "schemaVersion": 5,
     "language": "ja",
     "language_selected": false,
     "hotkeys": {
         "start_stop": "F7",
         "reset": "F8",
         "lap": "F9",
-        "undo_lap": "F10",
+        "undo_lap": "none",
+        "exit": "F4",
         "logout": "F5",
         "click_through": "F6",
         "hideout": "F11",
         "monastery": "F12",
-        "search_string_test": "F4",
-        "poetore_capture": "alt+d"
+        "search_string_test": "none",
+        "poetore_capture": "alt+d",
+        "cheat_sheets_toggle": "shift+space"
     },
     "poe_version": "",
     "poe_version_mode": "",
@@ -56,6 +58,18 @@
         "poe2": ""
     },
     "poe1_route_selected": false,
+    "cheat_sheets": {
+        "images": [],
+        "selected_id": "",
+        "opacity": 100,
+        "position": {
+            "x": 120,
+            "y": 120
+        },
+        "position_initialized": false,
+        "width": 900,
+        "height": 650
+    },
     "mini_guide_overlay": {
         "enabled": false,
         "display_mode": "standard",

@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
 )
 
 from src.ui.gem_tracker_widget import PoBSkillSetSelectionDialog
+from src.ui.cheat_sheets import CheatSheetManagerDialog, CheatSheetOverlay
 from src.ui.main_window import (
     GuideDetailLevelSelectionDialog,
     MainWindow,
@@ -143,6 +144,20 @@ def test_settings_generated_labels_and_tooltips_construct_in_english(qapp):
         _assert_no_japanese(tooltips)
     finally:
         dialog.deleteLater()
+        qapp.processEvents()
+
+
+def test_cheat_sheet_manager_and_empty_overlay_construct_in_english(qapp):
+    set_locale(EN)
+    manager = CheatSheetManagerDialog({"images": []})
+    overlay = CheatSheetOverlay({"images": []})
+    try:
+        _assert_no_japanese(_display_texts(manager))
+        _assert_no_japanese(_display_texts(overlay))
+        assert "No images are registered" in overlay.image_label.text()
+    finally:
+        manager.close()
+        overlay.close()
         qapp.processEvents()
 
 

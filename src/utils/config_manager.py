@@ -15,7 +15,7 @@ class ConfigManager:
     DEFAULT_CONFIG_FILE = "default_config.json"
     APP_NAME = "PoENavi"
     ENV_USER_DATA_DIR = "POENAVI_USER_DATA_DIR"
-    CURRENT_SCHEMA_VERSION = 4
+    CURRENT_SCHEMA_VERSION = 5
     POE1_ROUTE_ACT3_DEFAULT = "library_detour"
     POE1_ROUTE_ACT8_DEFAULT = "standard"
     POE1_ROUTE_ACT3_OLD_DEFAULT = "library_detour"
@@ -397,6 +397,17 @@ class ConfigManager:
             if isinstance(mini_navi, dict):
                 mini_navi.setdefault("display_mode", "standard")
 
+        if schema_version < 5:
+            hotkeys = migrated.get("hotkeys")
+            if isinstance(hotkeys, dict):
+                # 旧既定キーを使っている場合だけ、新しい既定配置へ移す。
+                # ユーザーが変更済みの割り当ては保持する。
+                if str(hotkeys.get("undo_lap", "")).lower() == "f10":
+                    hotkeys["undo_lap"] = "none"
+                if str(hotkeys.get("search_string_test", "")).lower() == "f4":
+                    hotkeys["search_string_test"] = "none"
+                hotkeys.setdefault("exit", "F4")
+
         if "poe1_route_selected" not in migrated:
             migrated["poe1_route_selected"] = cls._infer_poe1_route_selected(config)
 
@@ -449,21 +460,48 @@ class ConfigManager:
         default_config = cls._load_default_config_template()
         raw_hotkeys = raw_config.get("hotkeys")
         default_hotkeys = default_config.get("hotkeys", {})
-        if (
-            isinstance(raw_hotkeys, dict)
-            and "poetore_capture" not in raw_hotkeys
-            and isinstance(default_hotkeys, dict)
-        ):
-            poetore_default = str(
+        if isinstance(raw_hotkeys, dict) and isinstance(default_hotkeys, dict):
+            schema_version = raw_config.get("schemaVersion", 0)
+            if not isinstance(schema_version, int):
+                schema_version = 0
+
+            def normalized(value):
+                return str(value).strip().casefold()
+
+            def has_conflict(default_value, ignored_actions=()):
+                target = normalized(default_value)
+                return target != "none" and any(
+                    action not in ignored_actions and normalized(value) == target
+                    for action, value in raw_hotkeys.items()
+                )
+
+            if "poetore_capture" not in raw_hotkeys and has_conflict(
                 default_hotkeys.get("poetore_capture", "none")
-            ).strip().casefold()
-            if poetore_default != "none" and any(
-                str(value).strip().casefold() == poetore_default
-                for value in raw_hotkeys.values()
             ):
                 # An upgraded installation may already use Alt+D. Do not let
                 # the newly introduced default silently replace that action.
                 raw_hotkeys["poetore_capture"] = "none"
+
+            if "exit" not in raw_hotkeys:
+                ignored_actions = ()
+                if (
+                    schema_version < 5
+                    and normalized(raw_hotkeys.get("search_string_test", "none")) == "f4"
+                ):
+                    # F4 was the old search-test default. It can move to /exit
+                    # unless another user-selected action also owns F4.
+                    ignored_actions = ("search_string_test",)
+                if has_conflict(
+                    default_hotkeys.get("exit", "none"),
+                    ignored_actions=ignored_actions,
+                ):
+                    raw_hotkeys["exit"] = "none"
+
+            if (
+                "cheat_sheets_toggle" not in raw_hotkeys
+                and has_conflict(default_hotkeys.get("cheat_sheets_toggle", "none"))
+            ):
+                raw_hotkeys["cheat_sheets_toggle"] = "none"
         migrated = cls._migrate_config(cls._deep_merge(default_config, raw_config))
         if isinstance(raw_config, dict) and "area_note_migration_notice_shown" not in raw_config:
             # この案内は旧版利用者向け。新規設定ではdefault_configのtrueを使い、
