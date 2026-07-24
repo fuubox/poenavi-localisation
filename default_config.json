@@ -9,7 +9,8 @@
         "hideout": "F11",
         "monastery": "F12",
         "search_string_test": "F4",
-        "poetore_capture": "alt+d"
+        "poetore_capture": "alt+d",
+        "cheat_sheets_toggle": "shift+space"
     },
     "poe_version": "",
     "poe_version_mode": "",
@@ -53,6 +54,17 @@
         "poe2": ""
     },
     "poe1_route_selected": false,
+    "cheat_sheets": {
+        "images": [],
+        "selected_id": "",
+        "opacity": 100,
+        "position": {
+            "x": 120,
+            "y": 120
+        },
+        "width": 900,
+        "height": 650
+    },
     "mini_guide_overlay": {
         "enabled": false,
         "display_mode": "standard",

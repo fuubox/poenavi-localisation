@@ -1472,6 +1472,7 @@ class SettingsDialog(QDialog):
             "monastery": "F12",
             "search_string_test": "none",
             "poetore_capture": "alt+d",
+            "cheat_sheets_toggle": "shift+space",
         })
         self.poe_version = self.current_config.get("poe_version", POE1)
         self.poe_version_mode = self.current_config.get("poe_version_mode", "ask")
@@ -1669,6 +1670,14 @@ class SettingsDialog(QDialog):
         )
         h_layout10.addWidget(self.poetore_capture_btn)
         group_layout.addLayout(h_layout10)
+
+        h_layout11 = QHBoxLayout()
+        h_layout11.addWidget(QLabel("Cheat sheets表示:"))
+        self.cheat_sheets_toggle_btn = HotkeyButton(
+            self.hotkeys.get("cheat_sheets_toggle", "shift+space")
+        )
+        h_layout11.addWidget(self.cheat_sheets_toggle_btn)
+        group_layout.addLayout(h_layout11)
         
         self.logout_enabled_cb = QCheckBox("ログアウト機能を有効にする（TCP切断）")
         self.logout_enabled_cb.setChecked(self.current_config.get("logout_enabled", True))
@@ -2711,6 +2720,7 @@ class SettingsDialog(QDialog):
                 "monastery": self.monastery_btn.key_text,
                 "search_string_test": self.search_string_test_btn.key_text,
                 "poetore_capture": self.poetore_capture_btn.key_text,
+                "cheat_sheets_toggle": self.cheat_sheets_toggle_btn.key_text,
             },
             "logout_enabled": self.logout_enabled_cb.isChecked(),
             "client_log_paths": {

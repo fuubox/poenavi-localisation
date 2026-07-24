@@ -12,6 +12,12 @@ def test_alt_d_is_default_poetore_capture_hotkey():
     assert config["hotkeys"]["poetore_capture"] == "alt+d"
 
 
+def test_shift_space_is_default_cheat_sheets_toggle_hotkey():
+    with open("default_config.json", encoding="utf-8") as file:
+        config = json.load(file)
+    assert config["hotkeys"]["cheat_sheets_toggle"] == "shift+space"
+
+
 def test_ctrl_letter_control_character_is_normalized_to_letter():
     class CtrlDKey:
         char = "\x04"
@@ -64,8 +70,11 @@ def test_settings_dialog_can_change_poetore_capture_hotkey(monkeypatch):
     )
     try:
         assert dialog.poetore_capture_btn.key_text == "Ctrl+Shift+P"
+        assert dialog.cheat_sheets_toggle_btn.key_text == "shift+space"
         dialog.poetore_capture_btn.key_text = "Alt+Q"
+        dialog.cheat_sheets_toggle_btn.key_text = "Ctrl+Space"
         assert dialog.get_settings()["hotkeys"]["poetore_capture"] == "Alt+Q"
+        assert dialog.get_settings()["hotkeys"]["cheat_sheets_toggle"] == "Ctrl+Space"
     finally:
         dialog.close()
         app.processEvents()
