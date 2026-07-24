@@ -255,6 +255,7 @@ class TradeStatFilter:
     group_type: str = "and"
     group_key: str = ""
     group_min: int | None = None
+    decimal: bool = False
     # Awakened同様、集約したproperty/pseudo行にも寄与元Modの高Tierを表示する。
     # Trade APIへは送らない表示専用情報。
     tier_tags: tuple[int, ...] = ()
@@ -1855,6 +1856,7 @@ def _decorate_filters(item: ParsedItem, filters: tuple[TradeStatFilter, ...],
             selection_reason=reason,
             exact=exact,
             better=source.better if source else row.better,
+            decimal=source.decimal if source else row.decimal,
             tier_tags=(
                 _awakened_tier_tags(property_sources or pseudo_sources or sources)
                 or row.tier_tags

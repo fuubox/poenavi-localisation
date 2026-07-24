@@ -10,12 +10,13 @@ from PySide6.QtWidgets import QApplication, QCheckBox, QComboBox, QLabel, QPushB
 import pytest
 
 from src.poetore.ui import (
-    PoetoreWindow, _replace_filters_with_special_chips, show_poetore_window,
+    PoetoreWindow, _UniqueRollSlider, _replace_filters_with_special_chips,
+    show_poetore_window,
 )
 from src.poetore.window_position import PlacementContext
 from src.poetore.trade import (
     PRESET_FINISHED, PriceListing, PriceResult, TradeLeague, TradeStatFilter,
-    resolve_trade_stat_filters,
+    build_search_query, resolve_trade_stat_filters,
 )
 from src.poetore.parser import parse_item_text
 from src.poetore.models import ItemModifier, ParsedItem
@@ -727,6 +728,142 @@ def test_mod_filter_ui_shows_reason_tier_range_generation_and_matching(qapp):
         assert selected.min_value == 95
         assert selected.selection_reason == source.selection_reason
         assert selected.tier == 1
+    finally:
+        window.close()
+
+
+def test_unique_variable_roll_slider_drag_updates_minimum_and_enables_filter(qapp):
+    window = PoetoreWindow()
+    try:
+        window._parsed_item = ParsedItem(
+            "Amulets", "Unique", "The Example", "Gold Amulet", "accessory",
+        )
+        source = TradeStatFilter(
+            "explicit.life", "+40(30-50) to maximum Life", 38, "explicit", False,
+            read_value=40, roll_min=30, roll_max=50, better=1,
+        )
+        window._populate_stat_filters((source,))
+        window.show()
+        qapp.processEvents()
+        row = window.mod_filter_tree.topLevelItem(0)
+        slider = window.mod_filter_tree.itemWidget(row, 3).findChild(
+            _UniqueRollSlider, "uniqueRollSlider"
+        )
+        assert slider is not None
+
+        drag_x = slider.width() * 3 // 4
+        expected = slider._value_at(drag_x)
+        QTest.mousePress(slider, Qt.LeftButton, pos=QPoint(drag_x, 12))
+        assert slider._preview == expected
+        QTest.mouseMove(slider, QPoint(drag_x, 12))
+        QTest.mouseRelease(slider, Qt.LeftButton, pos=QPoint(drag_x, 12))
+        assert slider._preview is None
+
+        minimum_editor = window.mod_filter_tree.itemWidget(row, 4)
+        maximum_editor = window.mod_filter_tree.itemWidget(row, 5)
+        checkbox = window.mod_filter_tree.itemWidget(row, 0).findChild(
+            QCheckBox, "modFilterCheckbox"
+        )
+        assert minimum_editor.text() == f"{expected:g}"
+        assert maximum_editor.text() == ""
+        assert checkbox.isChecked()
+        selected = window._selected_stat_filters()[0]
+        assert selected.enabled is True
+        assert selected.min_value == expected
+        assert selected.max_value is None
+        query = build_search_query(
+            window._parsed_item, "Gold Amulet", (selected,),
+            trade_name="The Example",
+        )["query"]
+        assert query["stats"][0]["filters"] == [{
+            "id": "explicit.life", "value": {"min": expected},
+        }]
+    finally:
+        window.close()
+
+
+def test_unique_roll_slider_tracks_numeric_input_and_awakened_decimal_precision(qapp):
+    slider = _UniqueRollSlider((1.0, 2.0), 1.5, 1, True)
+    slider.resize(300, 24)
+    assert slider._value_at(100) == 1.33
+
+    window = PoetoreWindow()
+    try:
+        window._parsed_item = ParsedItem(
+            "Jewels", "Unique", "Decimal Example", "Jewel", "jewel",
+        )
+        source = TradeStatFilter(
+            "explicit.speed", "Speed", 1.4, "explicit", True,
+            read_value=1.5, roll_min=1.0, roll_max=2.0, better=1,
+            decimal=True,
+        )
+        window._populate_stat_filters((source,))
+        row = window.mod_filter_tree.topLevelItem(0)
+        roll_slider = window.mod_filter_tree.itemWidget(row, 3).findChild(
+            _UniqueRollSlider, "uniqueRollSlider"
+        )
+        window.mod_filter_tree.itemWidget(row, 4).setText("1.75")
+        assert roll_slider.searchValues() == (1.75, None)
+    finally:
+        window.close()
+
+
+def test_unique_lower_is_better_slider_updates_maximum(qapp):
+    window = PoetoreWindow()
+    try:
+        window._parsed_item = ParsedItem(
+            "Rings", "Unique", "Lower Example", "Gold Ring", "accessory",
+        )
+        source = TradeStatFilter(
+            "explicit.penalty", "Penalty", None, "explicit", False,
+            max_value=18, read_value=15, roll_min=10, roll_max=20, better=-1,
+        )
+        window._populate_stat_filters((source,))
+        window.show()
+        qapp.processEvents()
+        row = window.mod_filter_tree.topLevelItem(0)
+        slider = window.mod_filter_tree.itemWidget(row, 3).findChild(
+            _UniqueRollSlider, "uniqueRollSlider"
+        )
+        drag_x = slider.width() // 4
+        expected = slider._value_at(drag_x)
+        QTest.mouseClick(slider, Qt.LeftButton, pos=QPoint(drag_x, 12))
+
+        assert window.mod_filter_tree.itemWidget(row, 4).text() == ""
+        assert window.mod_filter_tree.itemWidget(row, 5).text() == f"{expected:g}"
+        selected = window._selected_stat_filters()[0]
+        assert selected.enabled is True
+        assert selected.min_value is None
+        assert selected.max_value == expected
+    finally:
+        window.close()
+
+
+@pytest.mark.parametrize("changes", [
+    {"roll_min": 10, "roll_max": 10},
+    {"better": 0},
+    {"option_value": 1},
+])
+def test_unique_roll_slider_is_hidden_for_unsupported_mods(qapp, changes):
+    window = PoetoreWindow()
+    try:
+        window._parsed_item = ParsedItem(
+            "Rings", "Unique", "Fixed Example", "Gold Ring", "accessory",
+        )
+        values = {
+            "roll_min": 10, "roll_max": 20, "better": 1, "option_value": None,
+        }
+        values.update(changes)
+        source = TradeStatFilter(
+            "explicit.stat_1", "Example", 10, "explicit", True,
+            read_value=15, **values,
+        )
+        window._populate_stat_filters((source,))
+        row = window.mod_filter_tree.topLevelItem(0)
+        text_widget = window.mod_filter_tree.itemWidget(row, 3)
+        assert text_widget is None or text_widget.findChild(
+            _UniqueRollSlider, "uniqueRollSlider"
+        ) is None
     finally:
         window.close()
 

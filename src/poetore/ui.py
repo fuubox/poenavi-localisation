@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-import threading
+import math
 import re
 import sys
+import threading
 from datetime import datetime, timezone
 from dataclasses import replace
 from pathlib import Path
@@ -72,6 +73,138 @@ _SPECIAL_CHIP_FILTER_IDS = {
     "property.map_blighted", "property.map_uberblighted",
     "property.map_completion_reward",
 }
+
+
+def _roll_decimal_places(value: float, decimal: bool) -> int:
+    """Match Awakened's stat-specific display precision."""
+    if not decimal or abs(value) >= 10:
+        return 0
+    return 2 if abs(value) < 2.3 else 1
+
+
+def _rounded_slider_value(value: float, decimal: bool, *, upper: bool) -> float:
+    places = _roll_decimal_places(value, decimal)
+    scale = 10 ** places
+    adjusted = value * scale
+    rounded = math.ceil(adjusted - 1e-9) if upper else math.floor(adjusted + 1e-9)
+    return rounded / scale
+
+
+class _UniqueRollSlider(QWidget):
+    """Qt counterpart of Awakened's StatRollSlider for comparable unique rolls."""
+
+    valueCommitted = Signal(object, object)
+
+    def __init__(
+        self, bounds: tuple[float, float], roll: float, better: int,
+        decimal: bool, parent: QWidget | None = None,
+    ):
+        super().__init__(parent)
+        self._low, self._high = bounds
+        self._roll = min(max(roll, self._low), self._high)
+        self._better = better
+        self._decimal = decimal
+        self._minimum: float | None = None
+        self._maximum: float | None = None
+        self._preview: float | None = None
+        self._dragging = False
+        self.setMinimumHeight(24)
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.setCursor(Qt.PointingHandCursor)
+        self.setToolTip("クリックまたはドラッグで検索値を調整")
+
+    def searchValues(self) -> tuple[float | None, float | None]:
+        return self._minimum, self._maximum
+
+    def setSearchValues(self, minimum: float | None, maximum: float | None):
+        self._minimum = minimum
+        self._maximum = maximum
+        self.update()
+
+    def _value_at(self, x: float) -> float:
+        width = max(1.0, float(self.width()))
+        ratio = min(1.0, max(0.0, x / width))
+        raw = self._low + (self._high - self._low) * ratio
+        value = _rounded_slider_value(
+            raw, self._decimal, upper=self._better < 0,
+        )
+        return min(self._high, max(self._low, value))
+
+    def _position(self, value: float) -> float:
+        span = self._high - self._low
+        if span <= 0:
+            return 0.0
+        return min(
+            float(self.width()),
+            max(0.0, (value - self._low) / span * self.width()),
+        )
+
+    @staticmethod
+    def _format(value: float) -> str:
+        return f"{value:g}"
+
+    def mousePressEvent(self, event):
+        if event.button() != Qt.LeftButton:
+            return super().mousePressEvent(event)
+        self._dragging = True
+        self._preview = self._value_at(event.position().x())
+        self.update()
+        event.accept()
+
+    def mouseMoveEvent(self, event):
+        if not self._dragging:
+            return super().mouseMoveEvent(event)
+        self._preview = self._value_at(event.position().x())
+        self.update()
+        event.accept()
+
+    def mouseReleaseEvent(self, event):
+        if event.button() != Qt.LeftButton or not self._dragging:
+            return super().mouseReleaseEvent(event)
+        self._preview = self._value_at(event.position().x())
+        if self._better > 0:
+            self._minimum, self._maximum = self._preview, None
+        else:
+            self._minimum, self._maximum = None, self._preview
+        self._dragging = False
+        self._preview = None
+        self.update()
+        self.valueCommitted.emit(self._minimum, self._maximum)
+        event.accept()
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+        rect = self.rect().adjusted(0, 3, -1, -3)
+        painter.setPen(QPen(QColor("#505650"), 1))
+        painter.setBrush(QColor("#252925"))
+        painter.drawRoundedRect(rect, 3, 3)
+
+        active = self._preview
+        if active is None:
+            active = self._minimum if self._better > 0 else self._maximum
+        if active is not None:
+            x = int(self._position(active))
+            fill = QRect(
+                x if self._better > 0 else 0,
+                rect.top(),
+                max(1, rect.right() - x + 1) if self._better > 0 else max(1, x),
+                rect.height(),
+            )
+            painter.setPen(Qt.NoPen)
+            painter.setBrush(QColor("#727a72"))
+            painter.drawRoundedRect(fill, 3, 3)
+
+        roll_x = int(self._position(self._roll))
+        painter.setPen(QPen(QColor("#111111"), 2))
+        painter.drawLine(roll_x, rect.top(), roll_x, rect.bottom())
+
+        painter.setPen(QColor("#c6cec1"))
+        painter.drawText(rect.adjusted(4, 0, -4, 0), Qt.AlignLeft | Qt.AlignVCenter, self._format(self._low))
+        painter.drawText(rect.adjusted(4, 0, -4, 0), Qt.AlignRight | Qt.AlignVCenter, self._format(self._high))
+        if self._dragging and self._preview is not None:
+            painter.setPen(QColor("#ffffff"))
+            painter.drawText(rect, Qt.AlignCenter, self._format(self._preview))
 
 
 def _is_valdo_map(item) -> bool:
@@ -2735,6 +2868,71 @@ class PoetoreWindow(QWidget):
             max_editor.setEnabled(stat_filter.option_value is None)
             max_editor.textEdited.connect(self._mark_search_dirty)
             self.mod_filter_tree.setItemWidget(row, _MOD_COLUMN_MAX, max_editor)
+            parsed_item = getattr(self, "_parsed_item", None)
+            show_unique_slider = (
+                parsed_item is not None
+                and parsed_item.rarity.casefold() in {"unique", "ユニーク"}
+                and stat_filter.roll_min is not None
+                and stat_filter.roll_max is not None
+                and stat_filter.roll_min < stat_filter.roll_max
+                and stat_filter.read_value is not None
+                and stat_filter.better in {-1, 1}
+                and stat_filter.option_value is None
+                and not stat_filter.exact
+            )
+            if show_unique_slider:
+                text_widget = QWidget()
+                text_layout = QVBoxLayout(text_widget)
+                text_layout.setContentsMargins(2, 1, 2, 1)
+                text_layout.setSpacing(1)
+                text_label = QLabel(stat_filter.text)
+                text_label.setToolTip(summary)
+                text_layout.addWidget(text_label)
+                slider = _UniqueRollSlider(
+                    (stat_filter.roll_min, stat_filter.roll_max),
+                    stat_filter.read_value,
+                    stat_filter.better,
+                    stat_filter.decimal,
+                )
+                slider.setObjectName("uniqueRollSlider")
+                slider.setSearchValues(stat_filter.min_value, stat_filter.max_value)
+                text_layout.addWidget(slider)
+                self.mod_filter_tree.setItemWidget(row, _MOD_COLUMN_TEXT, text_widget)
+                row.setSizeHint(_MOD_COLUMN_TEXT, QSize(0, 48))
+
+                def sync_slider(
+                    _text="",
+                    *,
+                    roll_slider=slider,
+                    minimum_editor=editor,
+                    maximum_editor=max_editor,
+                ):
+                    def number(text: str) -> float | None:
+                        try:
+                            return float(text) if text.strip() else None
+                        except ValueError:
+                            return None
+                    roll_slider.setSearchValues(
+                        number(minimum_editor.text()),
+                        number(maximum_editor.text()),
+                    )
+
+                def commit_slider(
+                    minimum,
+                    maximum,
+                    *,
+                    minimum_editor=editor,
+                    maximum_editor=max_editor,
+                    condition_checkbox=checkbox,
+                ):
+                    minimum_editor.setText("" if minimum is None else f"{minimum:g}")
+                    maximum_editor.setText("" if maximum is None else f"{maximum:g}")
+                    condition_checkbox.setChecked(True)
+                    self._mark_search_dirty()
+
+                editor.textChanged.connect(sync_slider)
+                max_editor.textChanged.connect(sync_slider)
+                slider.valueCommitted.connect(commit_slider)
 
     def _search_completed(self, result: PriceResult, initial_filters, search_generation: int):
         if search_generation != self._search_generation:
