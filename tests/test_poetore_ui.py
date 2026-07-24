@@ -48,6 +48,15 @@ def test_poetore_window_always_accepts_mouse_input(qapp):
         assert not window.trade_url_button.isEnabled()
         assert window.trade_currency_combo.currentData() == "any"
         assert window.trade_currency_combo.count() == 4
+        assert [
+            window.trade_currency_combo.itemText(index)
+            for index in range(window.trade_currency_combo.count())
+        ] == [
+            "すべての通貨",
+            "カオスオーブのみ",
+            "神のオーブのみ",
+            "カオスまたは神のオーブ",
+        ]
         assert not hasattr(window, "disclaimer_label")
         assert window.trade_league_combo.currentData() == "auto"
         assert window._selected_trade_league() is None

@@ -868,8 +868,10 @@ class PoetoreWindow(QWidget):
         self.trade_currency_combo = QComboBox()
         self.trade_currency_combo.addItem("すべての通貨", "any")
         self.trade_currency_combo.addItem("カオスオーブのみ", "chaos")
-        self.trade_currency_combo.addItem("ディヴァインオーブのみ", "divine")
-        self.trade_currency_combo.addItem("カオス＋ディヴァイン", "chaos_divine")
+        self.trade_currency_combo.addItem("神のオーブのみ", "divine")
+        self.trade_currency_combo.addItem(
+            "カオスまたは神のオーブ", "chaos_divine"
+        )
         self.listed_within_combo = QComboBox()
         for label, value in (
             ("期間指定なし", "any"), ("24時間以内", "1day"), ("3日以内", "3days"),
