@@ -2892,19 +2892,23 @@ class PoetoreWindow(QWidget):
             )
             if show_unique_slider:
                 text_widget = QWidget()
+                text_widget.setObjectName("uniqueRollCell")
                 # QTreeWidget requires an opaque cell widget; otherwise the native
                 # item text is painted through it and appears as a duplicate.
                 text_widget.setAutoFillBackground(True)
                 text_palette = text_widget.palette()
                 text_palette.setColor(QPalette.Window, QColor("#121212"))
                 text_widget.setPalette(text_palette)
+                text_widget.setStyleSheet(
+                    "QWidget#uniqueRollCell { background-color: #121212; }"
+                    "QWidget#uniqueRollCell QLabel {"
+                    " background-color: #121212; color: #d8ded4;"
+                    "}"
+                )
                 text_layout = QVBoxLayout(text_widget)
                 text_layout.setContentsMargins(2, 3, 2, 3)
                 text_layout.setSpacing(3)
                 text_label = QLabel(stat_filter.text)
-                text_label.setStyleSheet(
-                    "background-color: #121212; color: #d8ded4;"
-                )
                 text_label.setToolTip(summary)
                 text_layout.addWidget(text_label)
                 slider = _UniqueRollSlider(
