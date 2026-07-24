@@ -1641,7 +1641,7 @@ class SettingsDialog(QDialog):
         group_layout.addLayout(h_layout5)
         
         h_layout6 = QHBoxLayout()
-        h_layout6.addWidget(QLabel("ログアウト:"))
+        h_layout6.addWidget(QLabel("ログアウト（TCP切断）:"))
         self.logout_btn = HotkeyButton(self.hotkeys.get("logout", "F5"))
         h_layout6.addWidget(self.logout_btn)
         group_layout.addLayout(h_layout6)
