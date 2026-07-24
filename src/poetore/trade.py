@@ -1919,8 +1919,9 @@ def resolve_trade_stat_filters(
                 item.category == "accessory" and not talisman
                 and "corrupted" not in item.flags and "mirrored" not in item.flags
             )
-            if modifiable_amulet and not any(oil in {12, 13} for oil in modifier.oils):
-                # Awakened同様、付け直しやすい安価なAnointmentは候補自体を隠す。
+            if modifiable_amulet and not any(oil in {11, 12, 13} for oil in modifier.oils):
+                # Awakenedの銀・金に加え、相場が高くなりやすい乳白色を使う
+                # Anointmentも候補へ表示する。その他の付け直しやすいものは隠す。
                 continue
         roll_bounds = _unique_roll_bounds(modifier.text) if unique_item else None
         if unique_item and roll_bounds is None:

@@ -2353,6 +2353,46 @@ Corrupted
     assert web_payload["query"]["type"] == "ヴァールモルテンストライク"
 
 
+@pytest.mark.parametrize(
+    ("oils", "expected_visible"),
+    [
+        ((10, 10, 10), False),  # 黒色のみ
+        ((10, 11, 10), True),   # 乳白色
+        ((10, 12, 10), True),   # 銀色
+        ((10, 13, 10), True),   # 金色
+    ],
+)
+def test_modifiable_amulet_shows_anointments_using_valuable_oils(
+    oils, expected_visible,
+):
+    item = ParsedItem(
+        item_class="アミュレット",
+        rarity="レア",
+        name="試験用",
+        base_type="オニキスのアミュレット",
+        category="accessory",
+        modifiers=(
+            ItemModifier(
+                "処刑人 を割り当てる",
+                kind="enchant",
+                ref="Allocates #",
+                stat_id="enchant.allocates",
+                option_value=10016,
+                oils=oils,
+            ),
+        ),
+    )
+    entries = ({"id": "enchant.allocates", "type": "enchant", "text": "# を割り当てる"},)
+
+    with patch("src.poetore.trade._trade_stat_entries", return_value=entries):
+        filters = resolve_trade_stat_filters(item)
+
+    assert bool(filters) is expected_visible
+    if expected_visible:
+        assert filters[0].oils == oils
+        assert filters[0].enabled is False
+
+
 def test_query_supports_option_not_count_and_special_item_states():
     item = parse_item_text(ITEM)
     item = replace(item, flags=item.flags + ("searing_item", "tangled_item", "veiled"))
