@@ -25,6 +25,7 @@ from PySide6.QtWidgets import (
 )
 
 from src.ui.styles import Styles
+from src.poetore.window_position import path_of_exile_client_rect
 from src.utils.config_manager import ConfigManager
 
 
@@ -34,6 +35,7 @@ DEFAULT_CHEAT_SHEET_CONFIG = {
     "selected_id": "",
     "opacity": 100,
     "position": {"x": 120, "y": 120},
+    "position_initialized": False,
     "width": 900,
     "height": 650,
 }
@@ -325,6 +327,14 @@ class CheatSheetOverlay(QWidget):
         height = max(220, int(self.config.get("height", 650)))
         geometry = QRect(int(position.get("x", 120)), int(position.get("y", 120)), width, height)
         screens = QApplication.screens()
+        if screens and not self.config.get("position_initialized", False):
+            poe_rect = path_of_exile_client_rect()
+            target_point = poe_rect.center() if poe_rect is not None else QCursor.pos()
+            screen = QApplication.screenAt(target_point) or QApplication.primaryScreen()
+            if screen is not None:
+                available = screen.availableGeometry()
+                geometry.moveLeft(available.center().x() - (width - 1) // 2)
+                geometry.moveTop(available.top() + round(available.height() * 0.10))
         if screens and not any(screen.availableGeometry().intersects(geometry) for screen in screens):
             available = screens[0].availableGeometry()
             geometry.moveCenter(available.center())
@@ -345,7 +355,7 @@ class CheatSheetOverlay(QWidget):
     def _show_selected_image(self):
         images = self.config["images"]
         if not images:
-            self.title_label.setText("Cheat sheets")
+            self.title_label.setText("Cheat sheets（画像タイトルをドラッグで移動）")
             self.image_label.setText(
                 "画像が登録されていません\n\n"
                 "ぽえなび本体の「🖼」ボタンから画像を登録してください"
@@ -356,7 +366,8 @@ class CheatSheetOverlay(QWidget):
         index = self._selected_index()
         record = images[index]
         self.config["selected_id"] = record["id"]
-        self.title_label.setText(record.get("name") or "名称未設定")
+        title = record.get("name") or "名称未設定"
+        self.title_label.setText(f"{title}（画像タイトルをドラッグで移動）")
         self.counter_label.setText(f"{index + 1} / {len(images)}")
         self._pixmap = QPixmap(str(registered_image_path(record)))
         if self._pixmap.isNull():
@@ -395,6 +406,7 @@ class CheatSheetOverlay(QWidget):
     def hide_and_save(self):
         geometry = self.geometry()
         self.config["position"] = {"x": geometry.x(), "y": geometry.y()}
+        self.config["position_initialized"] = True
         self.config["width"] = geometry.width()
         self.config["height"] = geometry.height()
         self.config_changed.emit(dict(self.config))

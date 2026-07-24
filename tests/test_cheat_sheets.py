@@ -1,6 +1,8 @@
 from pathlib import Path
 
+from PySide6.QtCore import QRect
 from PySide6.QtGui import QColor, QImage
+from PySide6.QtWidgets import QApplication
 
 from src.ui.cheat_sheets import (
     CheatSheetManagerDialog,
@@ -58,6 +60,7 @@ def test_empty_overlay_guides_user_to_main_window_button(qapp):
     assert "画像が登録されていません" in overlay.image_label.text()
     assert "🖼" in overlay.image_label.text()
     assert "画像を登録してください" in overlay.image_label.text()
+    assert "画像タイトルをドラッグで移動" in overlay.title_label.text()
     overlay.close()
 
 
@@ -92,6 +95,7 @@ def test_overlay_switches_images_and_saves_geometry(qapp, tmp_path, monkeypatch)
             "images": [first, second],
             "selected_id": first["id"],
             "position": {"x": 20, "y": 30},
+            "position_initialized": True,
             "width": 500,
             "height": 350,
             "opacity": 80,
@@ -105,8 +109,33 @@ def test_overlay_switches_images_and_saves_geometry(qapp, tmp_path, monkeypatch)
     overlay.hide_and_save()
 
     assert overlay.config["selected_id"] == second["id"]
-    assert overlay.title_label.text() == "second"
+    assert overlay.title_label.text() == "second（画像タイトルをドラッグで移動）"
     assert saved[-1]["position"] == {"x": 40, "y": 50}
     assert saved[-1]["width"] == 600
     assert saved[-1]["height"] == 420
+    assert saved[-1]["position_initialized"] is True
+    overlay.close()
+
+
+def test_first_display_is_top_center_of_poe_monitor(qapp, monkeypatch):
+    screens = QApplication.screens()
+    assert screens
+    target_screen = screens[0]
+    available = target_screen.availableGeometry()
+    monkeypatch.setattr(
+        "src.ui.cheat_sheets.path_of_exile_client_rect",
+        lambda: QRect(available.left(), available.top(), available.width(), available.height()),
+    )
+
+    overlay = CheatSheetOverlay(
+        {
+            "images": [],
+            "position_initialized": False,
+            "width": 900,
+            "height": 650,
+        }
+    )
+
+    assert overlay.geometry().center().x() == available.center().x()
+    assert overlay.geometry().top() == available.top() + round(available.height() * 0.10)
     overlay.close()
