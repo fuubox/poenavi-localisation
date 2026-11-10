@@ -12,6 +12,7 @@ from pathlib import Path
 RUNTIME_DISTRIBUTIONS = (
     "PySide6", "PySide6-Addons", "PySide6-Essentials", "shiboken6",
     "pynput", "six", "urllib3", "miniaudio", "cffi", "pycparser",
+    "numpy", "opencv-python-headless",
     "PyInstaller", "altgraph",
     "pyinstaller-hooks-contrib", "packaging", "pefile", "pywin32-ctypes",
 )

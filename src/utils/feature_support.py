@@ -9,6 +9,7 @@ GEM_SHOP_SEARCH = "gem_shop_search"
 EXPEDITION_REWARD_OVERLAY = "expedition_reward_overlay"
 DESECRATION_TIER_OVERLAY = "desecration_tier_overlay"
 HEIST_CURIO_OCR = "heist_curio_ocr"
+MAP_LAYOUT_DETECT = "map_layout_detect"
 
 FEATURE_SUPPORTED_VERSIONS = {
     MINI_NAVI: frozenset({POE1, POE2}),
@@ -18,6 +19,7 @@ FEATURE_SUPPORTED_VERSIONS = {
     EXPEDITION_REWARD_OVERLAY: frozenset({POE2}),
     DESECRATION_TIER_OVERLAY: frozenset({POE2}),
     HEIST_CURIO_OCR: frozenset({POE1}),
+    MAP_LAYOUT_DETECT: frozenset({POE1}),
 }
 
 FEATURE_HOTKEY_ACTIONS = {
@@ -27,6 +29,7 @@ FEATURE_HOTKEY_ACTIONS = {
     EXPEDITION_REWARD_OVERLAY: frozenset({"expedition_reward_ocr"}),
     DESECRATION_TIER_OVERLAY: frozenset({"desecration_tier_ocr"}),
     HEIST_CURIO_OCR: frozenset({"heist_curio_ocr"}),
+    MAP_LAYOUT_DETECT: frozenset({"map_layout_detect"}),
 }
 
 

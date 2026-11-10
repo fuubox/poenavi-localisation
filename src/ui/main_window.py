@@ -52,6 +52,7 @@ from src.utils.poe_version_data import POE1, POE2, get_lap_labels, get_poe_label
 from src.utils.feature_support import (
     GEM_SHOP_SEARCH,
     MAP_CHECK,
+    MAP_LAYOUT_DETECT,
     MINI_NAVI,
     POETORE,
     is_feature_hotkey_supported,
@@ -3221,6 +3222,7 @@ class MainWindow(QMainWindow):
                                      ("search_string_test", "F4"), ("poetore_capture", "alt+d"),
                                      ("poetore_auto_hide", "ctrl+d"),
                                      ("map_check", "alt+f"),
+                                     ("map_layout_detect", "F1"),
                                      ("cheat_sheets_toggle", "shift+space")]:
                 active_version = self.config.get("poe_version", POE1)
                 if not is_feature_hotkey_supported(action, active_version):
@@ -3432,6 +3434,8 @@ class MainWindow(QMainWindow):
                 window.capture_hotkey_released()
         elif command == "map_check":
             self.capture_map_check_item()
+        elif command == "map_layout_detect":
+            self.detect_map_layout()
         elif command == "map_check_released":
             window = getattr(self, "_map_check_window", None)
             if window is not None:
@@ -4865,6 +4869,34 @@ class MainWindow(QMainWindow):
         if not is_feature_supported(MAP_CHECK, self.poe_version):
             return None
         self._ensure_map_check_window().capture_from_poe()
+
+    def detect_map_layout(self):
+        """ゲーム内マップ（Tab）を読み取り、現在エリアのマップ画像から一致するレイアウトを表示する。"""
+        if not is_feature_supported(MAP_LAYOUT_DETECT, self.poe_version):
+            return
+        paths = list(self.map_thumbnail.current_paths)
+        if len(paths) < 2:
+            return
+        from PySide6.QtGui import QGuiApplication
+
+        from src.poetore.window_position import path_of_exile_client_rect
+        from src.utils.layout_match import UNCERTAIN_MARGIN, qimage_to_bgr, rank_layouts
+
+        rect = path_of_exile_client_rect()
+        if rect is None:
+            self.map_thumbnail.header_label.setText(tr_ui("🗺 PoEのウィンドウが見つかりません"))
+            return
+        screen = QGuiApplication.screenAt(rect.center()) or QGuiApplication.primaryScreen()
+        image = screen.grabWindow(0, rect.x(), rect.y(), rect.width(), rect.height()).toImage()
+        # shortcut: matching runs on the UI thread (~0.5 s); move to a worker if it stutters.
+        ranked = rank_layouts(qimage_to_bgr(image), paths)
+        if not ranked:
+            self.map_thumbnail.header_label.setText(
+                tr_ui("🗺 マップを読み取れませんでした。ゲーム内のマップ（Tab）を開いてから押してください")
+            )
+            return
+        uncertain = len(ranked) > 1 and ranked[0][1] - ranked[1][1] < UNCERTAIN_MARGIN
+        self.map_thumbnail.show_detected_layout(ranked[0][0], uncertain)
 
     def _update_cheat_sheets_hotkey_tooltip(self):
         hotkey = self.config.get("hotkeys", {}).get("cheat_sheets_toggle", "shift+space")

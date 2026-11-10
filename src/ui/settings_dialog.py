@@ -2232,6 +2232,18 @@ class SettingsDialog(QDialog):
         map_check_layout.addWidget(self.map_check_btn)
         group_layout.addWidget(self.map_check_row)
 
+        self.map_layout_detect_row = QWidget()
+        map_layout_detect_layout = QHBoxLayout(self.map_layout_detect_row)
+        map_layout_detect_layout.setContentsMargins(0, 0, 0, 0)
+        map_layout_detect_layout.addWidget(QLabel(tr_ui("マップレイアウト判定:")))
+        self.map_layout_detect_btn = HotkeyButton(self.hotkeys.get("map_layout_detect", "F1"))
+        self.map_layout_detect_btn.setToolTip(tr_ui(
+            "ゲーム内のマップ（Tab）を開いた状態で押すと、現在のエリアのマップ画像から"
+            "一致するレイアウトを判定して拡大表示します。"
+        ))
+        map_layout_detect_layout.addWidget(self.map_layout_detect_btn)
+        group_layout.addWidget(self.map_layout_detect_row)
+
         self.gem_shop_search_settings = QWidget()
         gem_shop_search_settings_layout = QVBoxLayout(self.gem_shop_search_settings)
         gem_shop_search_settings_layout.setContentsMargins(0, 0, 0, 0)
@@ -3431,6 +3443,7 @@ class SettingsDialog(QDialog):
         """選択中のゲーム版で利用できる設定だけを表示する。"""
         self.monastery_row.setVisible(self.poe_version == POE1)
         self.map_check_row.setVisible(self.poe_version == POE1)
+        self.map_layout_detect_row.setVisible(self.poe_version == POE1)
         self.gem_shop_search_settings.setVisible(self.poe_version == POE1)
 
     def _refresh_app_mode_availability(self):
@@ -3461,11 +3474,13 @@ class SettingsDialog(QDialog):
             "poetore_capture": self.poetore_capture_btn.key_text,
             "poetore_auto_hide": self.poetore_auto_hide_btn.key_text,
             "map_check": self.map_check_btn.key_text,
+            "map_layout_detect": self.map_layout_detect_btn.key_text,
             "gem_shop_search": self.gem_shop_search_btn.key_text,
             "cheat_sheets_toggle": self.cheat_sheets_toggle_btn.key_text,
         }
         if self.poe_version == POE2:
             hotkeys.pop("map_check")
+            hotkeys.pop("map_layout_detect")
             hotkeys.pop("gem_shop_search")
         if not self.custom_commands_widget.validate(hotkeys):
             return
@@ -3484,6 +3499,7 @@ class SettingsDialog(QDialog):
                 "poetore_capture": "ぽえとれ検索（操作モード）",
                 "poetore_auto_hide": "ぽえとれ検索（AUTO-HIDE）",
                 "map_check": "Map Modチェック",
+                "map_layout_detect": "マップレイアウト判定",
                 "gem_shop_search": "ジェムショップ検索",
                 "cheat_sheets_toggle": "Cheat sheets表示",
             }
@@ -3567,6 +3583,7 @@ class SettingsDialog(QDialog):
                 "poetore_capture": self.poetore_capture_btn.key_text,
                 "poetore_auto_hide": self.poetore_auto_hide_btn.key_text,
                 "map_check": self.map_check_btn.key_text,
+                "map_layout_detect": self.map_layout_detect_btn.key_text,
                 "gem_shop_search": self.gem_shop_search_btn.key_text,
                 "cheat_sheets_toggle": self.cheat_sheets_toggle_btn.key_text,
             },

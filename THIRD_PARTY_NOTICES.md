@@ -153,6 +153,10 @@ PoENavi's Windows distribution is created with PyInstaller and includes upstream
   - <https://github.com/urllib3/urllib3>
 - **miniaudio (Python bindings)** — MIT No Attribution License
   - <https://github.com/irmen/pyminiaudio>
+- **NumPy** — BSD 3-Clause License (bundled components under their own permissive licenses)
+  - <https://github.com/numpy/numpy>
+- **OpenCV (opencv-python-headless)** — Apache License 2.0
+  - <https://github.com/opencv/opencv-python>
 - **CFFI / pycparser** — MIT License and BSD 3-Clause License, respectively
   - <https://cffi.readthedocs.io/>
   - <https://github.com/eliben/pycparser>

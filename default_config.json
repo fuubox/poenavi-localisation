@@ -23,6 +23,7 @@
         "desecration_tier_ocr": "alt+r",
         "heist_curio_ocr": "alt+e",
         "map_check": "alt+f",
+        "map_layout_detect": "F1",
         "gem_shop_search": "F2",
         "cheat_sheets_toggle": "shift+space"
     },
